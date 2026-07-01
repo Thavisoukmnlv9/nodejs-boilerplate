@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+pompt.md
 
 # Env & secrets
 .env
@@ -27,3 +28,4 @@ coverage/
 
 # Prisma
 prisma/*.db
+

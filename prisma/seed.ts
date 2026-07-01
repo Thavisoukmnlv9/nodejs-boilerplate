@@ -3,18 +3,11 @@ import { hashPassword } from '@/common/utils/password';
 import { ALL_PERMISSIONS, SYSTEM_ROLES } from '@/config/permissions';
 
 /**
- * Idempotent seed: permission catalog → system roles + grants → plan catalog → a
- * demo org (owner + member, one branch). Safe to run repeatedly (everything upserts
- * on a natural key).
+ * Idempotent seed: permission catalog → system roles + grants → a demo org
+ * (owner + member, one branch). Safe to run repeatedly (everything upserts on a
+ * natural key).
  */
 const prisma = new PrismaClient();
-
-const PLANS = [
-  { slug: 'starter', name: 'Starter' },
-  { slug: 'growth', name: 'Growth' },
-  { slug: 'pro', name: 'Pro' },
-  { slug: 'enterprise', name: 'Enterprise' },
-];
 
 async function seedPermissions(): Promise<void> {
   for (const p of ALL_PERMISSIONS) {
@@ -51,17 +44,6 @@ async function seedRoles(): Promise<void> {
     }
   }
   console.log(`  ✓ ${SYSTEM_ROLES.length} system roles + grants`);
-}
-
-async function seedPlans(): Promise<void> {
-  for (const plan of PLANS) {
-    await prisma.plan.upsert({
-      where: { slug: plan.slug },
-      update: { name: plan.name },
-      create: { slug: plan.slug, name: plan.name, billing_interval: 'MONTHLY', is_active: true },
-    });
-  }
-  console.log(`  ✓ ${PLANS.length} plans`);
 }
 
 async function seedDemo(): Promise<void> {
@@ -123,7 +105,6 @@ async function main(): Promise<void> {
   console.log('Seeding…');
   await seedPermissions();
   await seedRoles();
-  await seedPlans();
   await seedDemo();
   console.log('Seed complete.');
 }

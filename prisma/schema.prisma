@@ -217,72 +217,7 @@ model Branch {
   @@map("branch")
 }
 
-// ─── Platform Core: Subscription & Entitlements ──────────────────────────────
-
-model Plan {
-  id                  String    @id @default(cuid())
-  name                String?
-  slug                String?   @unique
-  description         String?
-  i18n_key            String?
-  billing_interval    String? // MONTHLY | YEARLY
-  base_price_cents    Int       @default(0)
-  annual_discount_bps Int       @default(2000)
-  currency            String    @default("USD")
-  is_active           Boolean   @default(true)
-  is_public           Boolean   @default(true)
-  sort_order          Int       @default(0)
-  provider_price_id   String?
-  created_at          DateTime  @default(now())
-  updated_at          DateTime  @updatedAt
-  deleted_at          DateTime?
-
-  plan_features PlanFeature[]
-
-  @@index([is_active, is_public, sort_order])
-  @@map("plan")
-}
-
-model Feature {
-  id          String    @id @default(cuid())
-  code        String?   @unique // bulk_export | sso | api_access | ...
-  name        String?
-  module      String?
-  i18n_key    String?
-  description String?
-  is_metered  Boolean   @default(false)
-  is_active   Boolean   @default(true)
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-  deleted_at  DateTime?
-
-  plan_features PlanFeature[]
-
-  @@index([module])
-  @@index([is_active])
-  @@map("feature")
-}
-
-model PlanFeature {
-  id           String    @id @default(cuid())
-  plan_id      String?
-  feature_code String?
-  included     Boolean   @default(true)
-  limit_value  Int? // null = unlimited
-  is_addon     Boolean   @default(false)
-  i18n_key     String?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-  deleted_at   DateTime?
-
-  plan    Plan?    @relation(fields: [plan_id], references: [id], onDelete: Cascade)
-  feature Feature? @relation(fields: [feature_code], references: [code], onDelete: Restrict)
-
-  @@unique([plan_id, feature_code])
-  @@index([plan_id])
-  @@index([feature_code])
-  @@map("plan_feature")
-}
+// ─── Platform Core: Entitlements ─────────────────────────────────────────────
 
 model EntitlementOverride {
   id              String    @id @default(cuid())

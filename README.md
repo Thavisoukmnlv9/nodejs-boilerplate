@@ -15,7 +15,7 @@ the existing **React admin portal** (`business-sync-admin-portal`) expects, over
 ## Architecture
 
 **Feature-based, "a module is a folder."** Each feature (`auth`, `users`, `me`, `files`,
-`roles`, `organizations`, `entitlements`, `health`) owns its routes → controller → service
+`roles`, `organizations`, `health`) owns its routes → controller → service
 → repository → schema → types → test. Dependencies point inward:
 
 ```
@@ -47,11 +47,10 @@ src/
     files/         multipart upload behind the pluggable storage layer
     roles/         list system + org roles (requirePermission)
     organizations/ current-org + the context resolver used by the guards
-    entitlements/  subscription → modules/limits/features (in-memory cached); backs requireModule
     health/        /healthz (liveness) · /readyz (readiness: DB)
   common/
     middleware/    requestId · httpLogger · validate · errorHandler · security · rateLimit
-                   · authGuard · loadUserOrg · rbac · requireModule · upload · metrics
+                   · authGuard · loadUserOrg · rbac · upload · metrics
     errors/        AppError + typed subclasses (NotFound, Unauthorized, Forbidden, …)
     utils/         asyncHandler · pagination · token(JWT) · cookies · password · hash · requestContext
     types/         context.ts + express.d.ts (typed req.auth / req.authContext)
@@ -149,13 +148,13 @@ Consumed verbatim by the admin portal (`fetch`, `credentials:'include'`, `Author
   revocable (logout, logout-all, password reset). Delivered as an httpOnly, Secure (prod),
   SameSite=strict cookie `refresh_token` scoped to `/api/v1/auth`; read cookie-first, body-fallback.
 - **`GET /api/v1/me`** returns `{ user, organization, permissions[], branches[],
-  default_branch_id, entitlements{modules,limits,…} }`.
+  default_branch_id, entitlements{modules,limits} }`. (`entitlements` is now always empty —
+  the subscription models it derived from were removed — but the field stays for SPA compat.)
 - **RBAC**: permissions are `{module}.{action}` codes granted by the user's role **in the
-  current org** (token `org_id`). Guards compose: `authGuard → requireModule(m) →
-  requirePermission(code)`.
+  current org** (token `org_id`). Guards compose: `authGuard → requirePermission(code)`.
 
-See [ASSUMPTIONS.md](ASSUMPTIONS.md) for the deliberate deviations from the brief (they favor
-the live system) and their rationale.
+The auth/RBAC contracts (token claims, refresh-cookie handling, permission codes, error
+shape) are matched to the live system; deliberate deviations favor it.
 
 ---
 
@@ -167,7 +166,7 @@ the live system) and their rationale.
 4. Routes compose guards + `validate(schema)`:
    ```ts
    router.post('/orders',
-     authGuard, requireModule('pos_shop'), requirePermission('pos_shop.sell'),
+     authGuard, requirePermission('pos_shop.sell'),
      validate({ body: createOrderSchema }), asyncHandler(orderController.create));
    ```
 5. Mount it in [`src/api.ts`](src/api.ts) (one `use()` line).
@@ -179,8 +178,8 @@ Both live in [`src/config/permissions.ts`](src/config/permissions.ts):
 - **Permission** → add the code string to the relevant `*_CODES` array (shape
   `{module}.{action}`), then `npm run prisma:seed` (idempotent upsert).
 - **Role** → add a `RoleSeed` to `SYSTEM_ROLES` (`grants: 'ALL'` or an explicit list); re-seed.
-- **New module** → add its code to `MODULE_CODES` and grant it in a plan's `SubscriptionModule`
-  rows. Nothing else changes — guards read these dynamically.
+- **New permission module** → add its codes to a `*_CODES` array and grant them to roles.
+  Nothing else changes — the RBAC guards read grants dynamically.
 
 ## Background work
 
@@ -206,9 +205,9 @@ infra) or BullMQ (needs Redis) — and add a worker entrypoint.
 ## How this scales / what to add next
 
 - **Mostly stateless app** — sessions live in Postgres, so the web tier scales
-  horizontally. Two things are currently **in-memory / per-instance** and need a shared
+  horizontally. One thing is currently **in-memory / per-instance** and needs a shared
   store before multi-instance scale-out: the **rate-limit store** (add `rate-limit-redis`
-  or a Postgres store) and the **entitlements cache** (move to Redis). Both are one-file swaps.
+  or a Postgres store). It's a one-file swap.
 - **Deeper multi-tenancy** — add Postgres RLS keyed on `organization_id` as defense-in-depth
   behind the app-level org scoping.
 - **Observability** — `/metrics` + request histogram are live; add OpenTelemetry tracing
