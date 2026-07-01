@@ -11,7 +11,7 @@ import {
   verifyRefreshToken,
   verifyResetToken,
 } from '@/common/utils/token';
-import { enqueuePasswordResetEmail } from '@/jobs/queues/email.queue';
+import { sendPasswordResetEmail } from '@/infra/email/email.service';
 import { type AuthRepository, authRepository } from '@/modules/auth/auth.repository';
 import type { IssuedTokens, RequestMeta, SessionResponse } from '@/modules/auth/auth.types';
 import type { ForgotPasswordInput, LoginInput, RegisterInput, ResetPasswordInput } from '@/modules/auth/auth.schema';
@@ -141,7 +141,12 @@ export class AuthService {
     if (!user?.email) return;
     const token = signResetToken(user.id);
     const resetUrl = `${env.WEB_BASE_URL}/reset-password?token=${encodeURIComponent(token)}`;
-    await enqueuePasswordResetEmail({ to: user.email, resetUrl, userId: user.id });
+    try {
+      // Sent inline (no queue). Swallow failures so we never leak whether the email exists.
+      await sendPasswordResetEmail({ to: user.email, resetUrl, userId: user.id });
+    } catch {
+      // Delivery errors are logged inside the email service; nothing to surface here.
+    }
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<void> {

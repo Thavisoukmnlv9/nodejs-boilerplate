@@ -4,9 +4,6 @@ import { hashPassword } from '@/common/utils/password';
 import { verifyAccessToken } from '@/common/utils/token';
 import { ForbiddenError, UnauthorizedError } from '@/common/errors';
 
-// Keep the unit test hermetic — no Redis/BullMQ side effects on import.
-jest.mock('@/jobs/queues/email.queue', () => ({ enqueuePasswordResetEmail: jest.fn(async () => undefined) }));
-
 const meta = { ipAddress: '127.0.0.1', userAgent: 'jest' };
 
 /** Minimal fake AuthRepository — only the methods `login` touches. */

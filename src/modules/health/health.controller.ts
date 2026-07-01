@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import { env } from '@/config/env';
 import { checkDatabase } from '@/infra/prisma';
-import { checkRedis } from '@/infra/redis';
 
 export const healthController = {
   /** Liveness — the process is up. Cheap, no dependencies. */
@@ -9,13 +8,12 @@ export const healthController = {
     res.json({ status: 'ok', service: env.APP_NAME, version: env.APP_VERSION });
   },
 
-  /** Readiness — dependencies (DB + Redis) are reachable. 503 if any is down. */
+  /** Readiness — the database is reachable. 503 if it's down. */
   async ready(_req: Request, res: Response): Promise<void> {
-    const [database, redis] = await Promise.all([checkDatabase(), checkRedis()]);
-    const ok = database && redis;
-    res.status(ok ? 200 : 503).json({
-      status: ok ? 'ok' : 'degraded',
-      checks: { database: database ? 'up' : 'down', redis: redis ? 'up' : 'down' },
+    const database = await checkDatabase();
+    res.status(database ? 200 : 503).json({
+      status: database ? 'ok' : 'degraded',
+      checks: { database: database ? 'up' : 'down' },
     });
   },
 };

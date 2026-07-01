@@ -1,36 +1,33 @@
-import { ACTIVE_SUBSCRIPTION_STATUSES, cacheKeys } from '@/config/constants';
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '@/config/constants';
 import { env } from '@/config/env';
-import { logger } from '@/config/logger';
-import { redis } from '@/infra/redis';
 import { type EntitlementRepository, entitlementRepository } from '@/modules/entitlements/entitlement.repository';
 import { EMPTY_ENTITLEMENTS, type Entitlements } from '@/modules/entitlements/entitlement.types';
 
 /**
- * Computes the org's entitlements from its subscription + plan, cached in Redis
- * (`entitlements:{orgId}`, TTL from REDIS_CACHE_TTL) since it's read on nearly
- * every `requireModule`-guarded request. Mutating a subscription should call
- * `invalidate(orgId)`. Redis failures degrade gracefully to a live DB build.
+ * Computes an org's entitlements from its subscription + plan. Read on nearly every
+ * `requireModule`-guarded request, so results are cached IN-MEMORY with a short TTL
+ * (ENTITLEMENTS_CACHE_TTL). Mutating a subscription should call `invalidate(orgId)`.
+ *
+ * The cache is per-instance (single-host target). To scale horizontally and keep
+ * caches coherent, move this behind a shared cache (Redis) — only this file changes.
  */
+interface CacheEntry {
+  value: Entitlements;
+  expiresAt: number;
+}
+
 export class EntitlementService {
+  private readonly cache = new Map<string, CacheEntry>();
+
   constructor(private readonly repo: EntitlementRepository = entitlementRepository) {}
 
   async getEntitlements(organizationId: string): Promise<Entitlements> {
-    const key = cacheKeys.entitlements(organizationId);
-    try {
-      const cached = await redis.get(key);
-      if (cached) return JSON.parse(cached) as Entitlements;
-    } catch (err) {
-      logger.warn({ err, organizationId }, 'Entitlements cache read failed; rebuilding');
-    }
+    const hit = this.cache.get(organizationId);
+    if (hit && hit.expiresAt > Date.now()) return hit.value;
 
-    const built = await this.build(organizationId);
-
-    try {
-      await redis.set(key, JSON.stringify(built), 'EX', env.REDIS_CACHE_TTL);
-    } catch (err) {
-      logger.warn({ err, organizationId }, 'Entitlements cache write failed');
-    }
-    return built;
+    const value = await this.build(organizationId);
+    this.cache.set(organizationId, { value, expiresAt: Date.now() + env.ENTITLEMENTS_CACHE_TTL * 1000 });
+    return value;
   }
 
   async canUseModule(organizationId: string, moduleCode: string): Promise<boolean> {
@@ -38,12 +35,8 @@ export class EntitlementService {
     return ent.modules.includes(moduleCode);
   }
 
-  async invalidate(organizationId: string): Promise<void> {
-    try {
-      await redis.del(cacheKeys.entitlements(organizationId));
-    } catch (err) {
-      logger.warn({ err, organizationId }, 'Entitlements cache invalidation failed');
-    }
+  invalidate(organizationId: string): void {
+    this.cache.delete(organizationId);
   }
 
   private async build(organizationId: string): Promise<Entitlements> {

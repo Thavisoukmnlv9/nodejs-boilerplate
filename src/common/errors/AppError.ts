@@ -90,7 +90,7 @@ export class TooManyRequestsError extends AppError {
   }
 }
 
-/** 503 — a dependency (DB/Redis) is unavailable; used by readiness checks. */
+/** 503 — a dependency (e.g. the database) is unavailable; used by readiness checks. */
 export class ServiceUnavailableError extends AppError {
   readonly statusCode = 503;
   readonly code = 'service_unavailable';

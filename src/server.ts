@@ -3,9 +3,6 @@ import { createApp } from '@/app';
 import { env } from '@/config/env';
 import { logger } from '@/config/logger';
 import { connectPrisma, disconnectPrisma } from '@/infra/prisma';
-import { disconnectRedis } from '@/infra/redis';
-import { emailQueue } from '@/jobs/queues/email.queue';
-import { mediaQueue } from '@/jobs/queues/media.queue';
 
 const SHUTDOWN_TIMEOUT_MS = 15_000;
 
@@ -22,9 +19,8 @@ async function bootstrap(): Promise<void> {
 
 /**
  * Graceful shutdown: stop accepting connections, drain in-flight requests, then
- * close the DB, Redis and queue producers. A hard timeout guarantees the process
- * exits even if something hangs. The app is otherwise stateless, so restarts/scale
- * events are safe.
+ * close the DB. A hard timeout guarantees the process exits even if something hangs.
+ * The app is otherwise stateless, so restarts/scale events are safe.
  */
 function installLifecycleHandlers(server: Server): void {
   let shuttingDown = false;
@@ -42,12 +38,7 @@ function installLifecycleHandlers(server: Server): void {
 
     server.close(() => {
       void (async () => {
-        await Promise.allSettled([
-          emailQueue.close(),
-          mediaQueue.close(),
-          disconnectPrisma(),
-          disconnectRedis(),
-        ]);
+        await disconnectPrisma();
         logger.info('Shutdown complete');
         process.exit(0);
       })();

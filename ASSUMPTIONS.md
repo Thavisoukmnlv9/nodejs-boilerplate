@@ -59,5 +59,22 @@ Each such choice is listed below.
 ## Fixed during live verification
 
 - **Readiness probe hang** — `/readyz` originally hung when Redis was down (ioredis queues
-  commands offline). `checkRedis`/`checkDatabase` now race a timeout so `/readyz` returns
-  `503` in ~1.5s. Verified live (DB up, Redis down → `{"database":"up","redis":"down"}`).
+  commands offline). `checkDatabase` (and, while it existed, `checkRedis`) now race a timeout.
+
+## Redis & the worker removed (change after the initial scaffold)
+
+Redis and the separate `worker.ts` process were removed by request. Redis had backed four
+things; each was replaced with a single-process equivalent (single-host is the deploy target):
+
+| Concern | Was | Now |
+|---|---|---|
+| Rate-limit store | `rate-limit-redis` | express-rate-limit **in-memory** (per-instance) |
+| Entitlements cache | Redis key + TTL | **in-memory `Map` + TTL** (`ENTITLEMENTS_CACHE_TTL`) |
+| Password-reset email | BullMQ job | **inline** send (`src/infra/email/email.service.ts`) |
+| Media post-processing | BullMQ job | **dropped** (stub; note left to re-add behind a queue) |
+| `/readyz` | DB + Redis | **DB only** |
+
+Dropped deps: `ioredis`, `bullmq`, `rate-limit-redis`. Trade-offs: rate limits and the
+entitlements cache are now **per-instance** — fine on one host; add a shared store (Redis /
+Postgres) before scaling to multiple app instances (each is a one-file swap). **No API or
+wire contract changed**, so the admin portal is unaffected.

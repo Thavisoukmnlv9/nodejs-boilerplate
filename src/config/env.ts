@@ -64,10 +64,8 @@ const schema = z
     // Database
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
-    // Redis
-    REDIS_URL: z.string().min(1).default('redis://localhost:6379/0'),
-    REDIS_CACHE_TTL: z.coerce.number().int().nonnegative().default(300),
-    BULLMQ_REDIS_URL: z.string().min(1).optional(),
+    // Entitlements in-memory cache TTL (seconds).
+    ENTITLEMENTS_CACHE_TTL: z.coerce.number().int().nonnegative().default(300),
 
     // Storage
     STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
@@ -87,7 +85,7 @@ const schema = z
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
     S3_SIGNED_URL_EXPIRE: z.coerce.number().int().positive().default(3600),
 
-    // Email (delivery is enqueued; the console provider just logs)
+    // Email (sent inline; the console provider just logs)
     EMAIL_PROVIDER: z.enum(['console', 'smtp', 'ses', 'resend']).default('console'),
     EMAIL_FROM: z.string().default('noreply@business-sync.io'),
     WEB_BASE_URL: z.string().default('http://localhost:3100'),
@@ -125,7 +123,6 @@ const e = parsed.data;
 export const env = {
   ...e,
   // Derived, computed once.
-  bullmqRedisUrl: e.BULLMQ_REDIS_URL ?? e.REDIS_URL,
   isProd: e.NODE_ENV === 'production',
   isDev: e.NODE_ENV === 'development',
   isTest: e.NODE_ENV === 'test',

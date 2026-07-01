@@ -1,4 +1,4 @@
-# Single-host stack: api + worker + postgres + redis. `docker compose up --build`.
+# Single-host stack: api + postgres. `docker compose up --build`.
 # Behind an nginx reverse proxy (same-origin SPA) in production; here the API is
 # exposed directly on :8080 for convenience.
 
@@ -6,8 +6,6 @@ x-app-env: &app-env
   NODE_ENV: production
   PORT: "8080"
   DATABASE_URL: postgresql://${POSTGRES_USER:-bsync}:${POSTGRES_PASSWORD:-bsync_dev}@postgres:5432/${POSTGRES_DB:-business_sync}?schema=public
-  REDIS_URL: redis://redis:6379/0
-  BULLMQ_REDIS_URL: redis://redis:6379/1
   JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please-set-a-32char-secret}
   ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3100}
   STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
@@ -20,32 +18,18 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       <<: *app-env
-      RUN_MIGRATIONS: "true" # this service owns migrations
+      RUN_MIGRATIONS: "true" # apply migrations on startup
     ports:
       - "8080:8080"
     volumes:
       - uploads:/app/uploads
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: unless-stopped
-
-  worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    command: ["node", "dist/worker.js"]
-    environment:
-      <<: *app-env # RUN_MIGRATIONS unset → worker does not migrate
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-      api: { condition: service_started }
     restart: unless-stopped
 
   postgres:
@@ -65,21 +49,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
 volumes:
   postgres_data:
-  redis_data:
   uploads:

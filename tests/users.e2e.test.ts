@@ -2,13 +2,10 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '@/app';
 import { disconnectPrisma } from '@/infra/prisma';
-import { disconnectRedis } from '@/infra/redis';
-import { emailQueue } from '@/jobs/queues/email.queue';
-import { mediaQueue } from '@/jobs/queues/media.queue';
 
 /**
- * Route integration test against a REAL test database + Redis. Requires:
- *   docker compose up -d postgres redis  &&  prisma migrate deploy  &&  prisma db seed
+ * Route integration test against a REAL test database. Requires:
+ *   docker compose up -d postgres  &&  prisma migrate deploy  &&  prisma db seed
  * CI sets RUN_INTEGRATION=1 after provisioning services; locally it's skipped so
  * `npm test` (unit) passes without infra. Exercises auth → RBAC → users end-to-end.
  */
@@ -22,7 +19,7 @@ describeIntegration('Users API (integration)', () => {
   });
 
   afterAll(async () => {
-    await Promise.allSettled([emailQueue.close(), mediaQueue.close(), disconnectPrisma(), disconnectRedis()]);
+    await disconnectPrisma();
   });
 
   async function login(email: string): Promise<string> {

@@ -2,15 +2,14 @@ import { unlink } from 'node:fs/promises';
 import type { File } from '@prisma/client';
 import { NotFoundError } from '@/common/errors';
 import { getStorage } from '@/infra/storage';
-import { enqueueProcessMedia } from '@/jobs/queues/media.queue';
 import { type FilesRepository, filesRepository } from '@/modules/files/files.repository';
 import type { FileView } from '@/modules/files/files.types';
 
 /**
  * Persists an upload: hand the temp file to the active storage adapter, record its
- * metadata (File row), enqueue post-processing for images, and ALWAYS clean up the
- * temp file (even on failure). Read URLs are computed per-request so S3 presigned
- * links stay fresh.
+ * metadata (File row), and ALWAYS clean up the temp file (even on failure). Read URLs
+ * are computed per-request so S3 presigned links stay fresh. (Post-upload processing
+ * like thumbnailing used to be enqueued; add it back behind a queue when needed.)
  */
 export class FilesService {
   constructor(private readonly repo: FilesRepository = filesRepository) {}
@@ -35,15 +34,6 @@ export class FilesService {
         size_bytes: stored.size,
         uploaded_by_id: userId,
       });
-
-      if (stored.contentType.startsWith('image/')) {
-        await enqueueProcessMedia({
-          fileId: record.id,
-          bucket: stored.bucket,
-          key: stored.key,
-          contentType: stored.contentType,
-        });
-      }
 
       return this.toView(record, stored.url);
     } finally {

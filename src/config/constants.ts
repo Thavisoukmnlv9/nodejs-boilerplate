@@ -24,15 +24,3 @@ export const UserStatus = {
 
 /** OrganizationSubscription.status values that grant entitlements. */
 export const ACTIVE_SUBSCRIPTION_STATUSES = ['ACTIVE', 'TRIALING'] as const;
-
-/** Redis key builders. */
-export const cacheKeys = {
-  entitlements: (orgId: string) => `entitlements:${orgId}`,
-} as const;
-
-/** BullMQ queue names. */
-export const QueueName = {
-  EMAIL: 'email',
-  MEDIA: 'media',
-} as const;
-export type QueueName = (typeof QueueName)[keyof typeof QueueName];

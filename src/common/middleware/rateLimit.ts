@@ -1,24 +1,18 @@
 import rateLimit, { type Options } from 'express-rate-limit';
-import { RedisStore } from 'rate-limit-redis';
-import { redis } from '@/infra/redis';
 import { env } from '@/config/env';
 import { TooManyRequestsError } from '@/common/errors';
 
 /**
- * Redis-backed rate limiting so limits hold ACROSS instances (the app is stateless
- * and horizontally scaled). Per-route budgets match the reference service:
- * login 5/min · register 10/hour · refresh 60/min · forgot-password 3/hour, plus a
- * coarse global cap. Keyed by client IP (needs `app.set('trust proxy', …)`).
+ * Per-route rate limiting using express-rate-limit's default IN-MEMORY store.
+ * Budgets match the reference service: login 5/min · register 10/hour ·
+ * refresh 60/min · forgot-password 3/hour, plus a coarse global cap. Keyed by
+ * client IP (needs `app.set('trust proxy', …)`).
+ *
+ * NOTE: the in-memory store is PER-INSTANCE. On a single host (the target deploy)
+ * that's fine. If you scale to multiple app instances and need shared limits,
+ * swap in a distributed store (e.g. `rate-limit-redis` or `@rate-limit/postgres`)
+ * behind this same config — this is the only file that changes.
  */
-function makeStore(prefix: string): RedisStore {
-  return new RedisStore({
-    prefix,
-    // ioredis' generic command runner, adapted to rate-limit-redis' sendCommand.
-    sendCommand: (...args: string[]) =>
-      (redis as unknown as { call: (...a: string[]) => Promise<unknown> }).call(...args) as Promise<never>,
-  });
-}
-
 const handler: Options['handler'] = (req, _res, next) => {
   const reset = (req as unknown as { rateLimit?: { resetTime?: Date } }).rateLimit?.resetTime;
   const retryAfter = reset ? Math.max(1, Math.ceil((reset.getTime() - Date.now()) / 1000)) : undefined;
@@ -27,27 +21,12 @@ const handler: Options['handler'] = (req, _res, next) => {
 
 const common = { standardHeaders: 'draft-7', legacyHeaders: false, handler } satisfies Partial<Options>;
 
-export const globalLimiter = rateLimit({
-  ...common,
-  windowMs: 60_000,
-  limit: env.RATE_LIMIT_GLOBAL_PER_MINUTE,
-  store: makeStore('rl:global:'),
-});
+export const globalLimiter = rateLimit({ ...common, windowMs: 60_000, limit: env.RATE_LIMIT_GLOBAL_PER_MINUTE });
 
-export const loginLimiter = rateLimit({ ...common, windowMs: 60_000, limit: 5, store: makeStore('rl:login:') });
+export const loginLimiter = rateLimit({ ...common, windowMs: 60_000, limit: 5 });
 
-export const registerLimiter = rateLimit({
-  ...common,
-  windowMs: 60 * 60_000,
-  limit: 10,
-  store: makeStore('rl:register:'),
-});
+export const registerLimiter = rateLimit({ ...common, windowMs: 60 * 60_000, limit: 10 });
 
-export const refreshLimiter = rateLimit({ ...common, windowMs: 60_000, limit: 60, store: makeStore('rl:refresh:') });
+export const refreshLimiter = rateLimit({ ...common, windowMs: 60_000, limit: 60 });
 
-export const forgotPasswordLimiter = rateLimit({
-  ...common,
-  windowMs: 60 * 60_000,
-  limit: 3,
-  store: makeStore('rl:forgot:'),
-});
+export const forgotPasswordLimiter = rateLimit({ ...common, windowMs: 60 * 60_000, limit: 3 });
