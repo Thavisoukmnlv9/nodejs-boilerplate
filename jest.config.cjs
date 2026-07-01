@@ -1,15 +1,15 @@
 // CommonJS config (avoids needing ts-node just to read the config file).
-// ts-jest still compiles the tests; path aliases mirror tsconfig `paths`.
+// The generated Prisma client is ESM-only (uses import.meta), so tests run
+// under ts-jest's ESM preset (see package.json "test" script for the
+// --experimental-vm-modules flag this requires).
+const { createDefaultEsmPreset } = require('ts-jest');
 
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'ts-jest',
+  ...createDefaultEsmPreset({ tsconfig: 'tsconfig.json' }),
   testEnvironment: 'node',
   roots: ['<rootDir>/src', '<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
-  transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
-  },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
