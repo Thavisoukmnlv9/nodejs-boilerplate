@@ -1,4 +1,4 @@
-import type { Branch } from '@prisma/client';
+import type { Branch } from '@/generated/prisma/client';
 import { BaseRepository } from '@/infra/prisma';
 
 /** Data access for identity/tenancy resolution. Owns no HTTP concerns. */

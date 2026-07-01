@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/common/errors';
 import { paginate, type Paginated } from '@/common/utils/pagination';
 import { type UsersRepository, usersRepository } from '@/modules/users/users.repository';

@@ -28,4 +28,5 @@ coverage/
 
 # Prisma
 prisma/*.db
+src/generated/
 

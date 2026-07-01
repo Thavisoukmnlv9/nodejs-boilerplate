@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
 import { BaseRepository } from '@/infra/prisma';
 
 const withUser = { user: true } satisfies Prisma.OrganizationMemberInclude;

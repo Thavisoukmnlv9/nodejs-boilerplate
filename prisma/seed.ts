@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@/generated/prisma/client';
 import { hashPassword } from '@/common/utils/password';
 import { ALL_PERMISSIONS, SYSTEM_ROLES } from '@/config/permissions';
 
@@ -7,7 +8,8 @@ import { ALL_PERMISSIONS, SYSTEM_ROLES } from '@/config/permissions';
  * (owner + member, one branch). Safe to run repeatedly (everything upserts on a
  * natural key).
  */
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 async function seedPermissions(): Promise<void> {
   for (const p of ALL_PERMISSIONS) {

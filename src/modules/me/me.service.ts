@@ -1,4 +1,4 @@
-import type { Organization, User } from '@prisma/client';
+import type { Organization, User } from '@/generated/prisma/client';
 import { UserStatus } from '@/config/constants';
 import { BadRequestError, UnauthorizedError } from '@/common/errors';
 import { organizationRepository } from '@/modules/organizations/organization.repository';

@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
 import { BaseRepository } from '@/infra/prisma';
 
 export class FilesRepository extends BaseRepository {

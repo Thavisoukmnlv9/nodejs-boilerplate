@@ -1,4 +1,4 @@
-import type { Organization, OrganizationMember, User } from '@prisma/client';
+import type { Organization, OrganizationMember, User } from '@/generated/prisma/client';
 
 /** The lightweight principal decoded from the access token by `authGuard`. */
 export interface AuthPrincipal {

@@ -1,4 +1,4 @@
-import type { Branch, OrganizationMember } from '@prisma/client';
+import type { Branch, OrganizationMember } from '@/generated/prisma/client';
 import { UserStatus } from '@/config/constants';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '@/common/errors';
 import type { AuthContext } from '@/common/types/context';

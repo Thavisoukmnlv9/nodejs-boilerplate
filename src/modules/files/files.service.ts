@@ -1,5 +1,5 @@
 import { unlink } from 'node:fs/promises';
-import type { File } from '@prisma/client';
+import type { File } from '@/generated/prisma/client';
 import { NotFoundError } from '@/common/errors';
 import { getStorage } from '@/infra/storage';
 import { type FilesRepository, filesRepository } from '@/modules/files/files.repository';

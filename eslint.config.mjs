@@ -5,7 +5,15 @@ import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'logs/**', 'uploads/**', 'prisma/migrations/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      'logs/**',
+      'uploads/**',
+      'prisma/migrations/**',
+      'src/generated/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -34,7 +42,7 @@ export default tseslint.config(
   },
   {
     // CommonJS tooling config.
-    files: ['jest.config.js', '**/*.cjs'],
+    files: ['jest.config.cjs', '**/*.cjs'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { module: 'writable', require: 'readonly', process: 'readonly', __dirname: 'readonly' },

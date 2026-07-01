@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { env } from '@/config/env';
 import { UserStatus } from '@/config/constants';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '@/common/errors';
