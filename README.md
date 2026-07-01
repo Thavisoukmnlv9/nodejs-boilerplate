@@ -15,26 +15,17 @@ the existing **React admin portal** (`business-sync-admin-portal`) expects, over
 ## Architecture
 
 **Feature-based, "a module is a folder."** Each feature (`auth`, `users`, `me`, `files`,
-`roles`, `organizations`, `health`) owns its routes → controller → service
-→ repository → schema → types → test. Dependencies point inward:
+`roles`, `organizations`, `health`) owns its routes → controller → service → repository
+→ schema → types → test. Dependencies point inward:
 
 ```
 routes → controller (HTTP only) → service (business logic) → repository (data access)
 ```
 
 Nothing imports another feature's internals — features collaborate through **services**.
-Cross-cutting concerns live in shared layers:
-
-- `common/` — middleware, error hierarchy, utils, shared types (the request augmentation)
-- `infra/` — Prisma singleton + base repository + transaction helper, email, storage adapters
-- `config/` — Zod-validated env, logger, CORS, Swagger, constants, the permission catalog
-
-**Lineage.** The reference service groups code as `core/` (cross-cutting infra),
-`platform/` (tenant/identity business logic), and `modules/` (business verticals). This
-tree collapses `core/ → common/ + infra/ + config/` and folds `platform/` features into
-`src/modules/`, keeping the feature-as-a-folder rule. Business verticals (pos_shop,
-pos_food_service, …) are additive: they become new `src/modules/<vertical>/` folders that
-reuse the same guards and base classes.
+Cross-cutting concerns live in shared layers: `common/` (middleware, errors, utils),
+`infra/` (Prisma singleton, email, storage adapters), `config/` (validated env, logger,
+CORS, Swagger, the permission catalog).
 
 ### Folder tree
 
@@ -48,12 +39,7 @@ src/
     roles/         list system + org roles (requirePermission)
     organizations/ current-org + the context resolver used by the guards
     health/        /healthz (liveness) · /readyz (readiness: DB)
-  common/
-    middleware/    requestId · httpLogger · validate · errorHandler · security · rateLimit
-                   · authGuard · loadUserOrg · rbac · upload · metrics
-    errors/        AppError + typed subclasses (NotFound, Unauthorized, Forbidden, …)
-    utils/         asyncHandler · pagination · token(JWT) · cookies · password · hash · requestContext
-    types/         context.ts + express.d.ts (typed req.auth / req.authContext)
+  common/          middleware (authGuard, rbac, validate, errorHandler, …) · errors · utils · types
   config/          env.ts (Zod) · logger.ts (pino) · cors.ts · swagger.ts · constants.ts · permissions.ts
   infra/
     prisma/        client singleton · base.repository · transaction
@@ -62,7 +48,8 @@ src/
   api.ts           /api/v1 router (mounts every feature)
   app.ts           builds & wires the Express app (middleware order)
   server.ts        bootstrap + graceful shutdown
-prisma/            schema.prisma (platform-core subset) · migrations/ · seed.ts
+prisma/            schema.prisma (platform-core subset) · migrations/
+scripts/seed/      seed.ts per environment — dev/ (+ users.ts, roles.ts, permissions.ts split), uat/, prod/
 docker/            Dockerfile (multi-stage, non-root) · entrypoint.sh
 ```
 
@@ -88,12 +75,12 @@ docker/            Dockerfile (multi-stage, non-root) · entrypoint.sh
 npm install
 cp .env.example .env          # then edit JWT_SECRET, DATABASE_URL, …
 npx prisma migrate dev        # create tables (first run also generates the client)
-npm run prisma:seed           # permission catalog, system roles, demo org
+npm run prisma:seed:dev       # permission catalog, system roles, demo org
 npm run dev                   # API on http://localhost:8080  (docs at /docs)
 ```
 
 Smoke test: `curl localhost:8080/healthz` → `{"status":"ok",…}`.
-Log in with the seeded owner (`owner@demo.test` / `Password123`).
+Log in with a seeded demo user (`owner@demo.test` / `Password123`).
 
 **All-in with Docker:**
 
@@ -115,8 +102,20 @@ docker compose up --build     # api + postgres
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run prisma:migrate` | `prisma migrate dev` |
 | `npm run prisma:deploy` | `prisma migrate deploy` (production) |
-| `npm run prisma:seed` / `:studio` / `:reset` | seed / GUI / reset |
+| `npm run prisma:seed:dev\|uat\|prod` | environment-specific seed (see below) |
+| `npm run prisma:studio` / `:reset` | GUI / reset |
 | `npm run docker:build\|up\|down` | compose lifecycle |
+
+**Seeding.** All three environments share the permission catalog and system roles from
+[`src/config/permissions.ts`](src/config/permissions.ts):
+
+- `dev` ([`scripts/seed/dev/`](scripts/seed/dev/)) — catalog + roles + 5 demo users (one
+  per system role) + 5 demo organizations with branches, members, sessions, entitlement
+  overrides, and files.
+- `uat` ([`scripts/seed/uat/seed.ts`](scripts/seed/uat/seed.ts)) — catalog + roles + one
+  QA organization with the same 5 test users.
+- `prod` ([`scripts/seed/prod/seed.ts`](scripts/seed/prod/seed.ts)) — catalog + roles
+  only. No demo data; production accounts come from normal signup.
 
 ---
 
@@ -148,13 +147,9 @@ Consumed verbatim by the admin portal (`fetch`, `credentials:'include'`, `Author
   revocable (logout, logout-all, password reset). Delivered as an httpOnly, Secure (prod),
   SameSite=strict cookie `refresh_token` scoped to `/api/v1/auth`; read cookie-first, body-fallback.
 - **`GET /api/v1/me`** returns `{ user, organization, permissions[], branches[],
-  default_branch_id, entitlements{modules,limits} }`. (`entitlements` is now always empty —
-  the subscription models it derived from were removed — but the field stays for SPA compat.)
+  default_branch_id, entitlements{modules,limits} }`.
 - **RBAC**: permissions are `{module}.{action}` codes granted by the user's role **in the
   current org** (token `org_id`). Guards compose: `authGuard → requirePermission(code)`.
-
-The auth/RBAC contracts (token claims, refresh-cookie handling, permission codes, error
-shape) are matched to the live system; deliberate deviations favor it.
 
 ---
 
@@ -166,7 +161,7 @@ shape) are matched to the live system; deliberate deviations favor it.
 4. Routes compose guards + `validate(schema)`:
    ```ts
    router.post('/orders',
-     authGuard, requirePermission('pos_shop.sell'),
+     authGuard, requirePermission('pos_shop.manage'),
      validate({ body: createOrderSchema }), asyncHandler(orderController.create));
    ```
 5. Mount it in [`src/api.ts`](src/api.ts) (one `use()` line).
@@ -175,20 +170,22 @@ shape) are matched to the live system; deliberate deviations favor it.
 
 Both live in [`src/config/permissions.ts`](src/config/permissions.ts):
 
-- **Permission** → add the code string to the relevant `*_CODES` array (shape
-  `{module}.{action}`), then `npm run prisma:seed` (idempotent upsert).
-- **Role** → add a `RoleSeed` to `SYSTEM_ROLES` (`grants: 'ALL'` or an explicit list); re-seed.
-- **New permission module** → add its codes to a `*_CODES` array and grant them to roles.
-  Nothing else changes — the RBAC guards read grants dynamically.
+- **New module** → add its name to `MODULE_CODES`. It automatically gets every action in
+  `MODULE_ACTIONS` (`view`, `create`, `update`, `delete`, `manage`, `reports`) as
+  `{module}.{action}` codes — nothing else to write.
+- **New action for every module** → add it to `MODULE_ACTIONS`.
+- **Platform-only permission** → add the code to `PLATFORM_CODES` (shape `platform.{resource}.{action}`).
+- **Role** → add a `RoleSeed` to `SYSTEM_ROLES` (`grants: 'ALL'` or an explicit code list).
+
+Then re-seed (`npm run prisma:seed:dev` etc.) — everything upserts, so it's safe to re-run.
 
 ## Background work
 
 This service runs in a **single process** — no separate worker, no Redis. The one piece
 of async work, the password-reset email, is sent **inline** via
 [`src/infra/email/email.service.ts`](src/infra/email/email.service.ts) (pluggable provider;
-`console` logs in dev). If background work grows (thumbnailing, bulk exports, retries at
-scale), reintroduce a queue behind that same interface — `pg-boss` (Postgres-backed, no new
-infra) or BullMQ (needs Redis) — and add a worker entrypoint.
+`console` logs in dev). If background work grows, reintroduce a queue behind that same
+interface — `pg-boss` (Postgres-backed) or BullMQ (needs Redis).
 
 ---
 
@@ -202,23 +199,17 @@ infra) or BullMQ (needs Redis) — and add a worker entrypoint.
 
 ---
 
-## How this scales / what to add next
+## What to add next
 
-- **Mostly stateless app** — sessions live in Postgres, so the web tier scales
-  horizontally. One thing is currently **in-memory / per-instance** and needs a shared
-  store before multi-instance scale-out: the **rate-limit store** (add `rate-limit-redis`
-  or a Postgres store). It's a one-file swap.
+- **Rate-limit store is in-memory / per-instance** — swap for `rate-limit-redis` or a
+  Postgres store before scaling the web tier past one instance.
 - **Deeper multi-tenancy** — add Postgres RLS keyed on `organization_id` as defense-in-depth
   behind the app-level org scoping.
-- **Observability** — `/metrics` + request histogram are live; add OpenTelemetry tracing
-  around the same request lifecycle (hooks are in place).
+- **Observability** — `/metrics` + request histogram are live; OpenTelemetry tracing hooks
+  are in place but unused.
 - **Feature flags / org-scoped custom roles** — the `Role(organization_id)` and
   `EntitlementOverride` tables already support both; add the write endpoints.
-- **Background jobs** — reintroduce a queue (`pg-boss` on Postgres, or BullMQ on Redis) +
-  a worker process when async work outgrows inline sending.
-- **Blue-green / rolling deploys** — graceful shutdown drains in-flight requests and closes
-  the DB on SIGTERM.
-- **Remaining POS verticals** — copy the module template; add codes + grants.
+- **Background jobs** — a queue + worker process, once async work outgrows inline sending.
 
 **Key trade-offs:** Express 4 (not 5) for full middleware compatibility (`hpp` needs a
 writable `req.query`); bcryptjs (pure-JS, hash-compatible with the reference's Python bcrypt);
