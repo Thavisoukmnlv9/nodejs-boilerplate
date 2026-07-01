@@ -64,9 +64,6 @@ const schema = z
     // Database
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
-    // Entitlements in-memory cache TTL (seconds).
-    ENTITLEMENTS_CACHE_TTL: z.coerce.number().int().nonnegative().default(300),
-
     // Storage
     STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
     UPLOAD_DIR: z.string().default('./uploads'),

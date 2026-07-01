@@ -59,6 +59,7 @@ describeIntegration('Users API (integration)', () => {
     expect(res.status).toBe(200);
     expect(res.body.user.email).toBe('owner@demo.test');
     expect(res.body.permissions).toContain('platform.users.read');
-    expect(res.body.entitlements.modules).toContain('pos_shop');
+    // Entitlements are always empty since the subscription models were removed.
+    expect(res.body.entitlements).toEqual({ modules: [], limits: {} });
   });
 });

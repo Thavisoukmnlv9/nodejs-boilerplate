@@ -43,5 +43,5 @@ export interface MeResponse {
   permissions: string[];
   branches: MeBranch[];
   default_branch_id: string | null;
-  entitlements: Entitlements;
+  entitlements: MeEntitlements;
 }

@@ -25,7 +25,7 @@ export interface RoleSeed {
   grants: 'ALL' | string[];
 }
 
-/** Subscription module codes (drive `requireModule` + entitlements). */
+/** Vertical/module codes — a reference catalog for permission code prefixes. */
 export const MODULE_CODES = [
   'pos_shop',
   'pos_food_service',
@@ -169,8 +169,8 @@ const CASHIER_GRANTS = ['pos_shop.sell', 'pos_shop.refund', 'pos_shop.customer_o
 /**
  * System roles (global: organization_id = null, is_system = true). Owner gets
  * everything; Admin/Manager get everything except the danger zone (Manager's extra
- * power is PIN-gated at the POS-operation level via the manager_pin token, not by
- * a broader grant). Room is left for org-scoped custom roles.
+ * power would be PIN-gated at the POS-operation level, not by a broader grant).
+ * Room is left for org-scoped custom roles.
  */
 export const SYSTEM_ROLES: RoleSeed[] = [
   {

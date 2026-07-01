@@ -1,6 +1,6 @@
 import jwt, { type JwtPayload, type SignOptions } from 'jsonwebtoken';
 import { env } from '@/config/env';
-import { MANAGER_PIN_TTL_MINUTES, TokenType } from '@/config/constants';
+import { TokenType } from '@/config/constants';
 import { UnauthorizedError } from '@/common/errors';
 
 /**
@@ -8,7 +8,6 @@ import { UnauthorizedError } from '@/common/errors';
  * - access  {sub, org_id?, type:"access"}   TTL 15m
  * - refresh {sub, session_id, type:"refresh"} TTL 7d
  * - reset   {sub, type:"reset"}               TTL 1h
- * - manager_pin {sub, org_id, type:"manager_pin"} TTL 5m
  *
  * Every token carries `type` so one can never be replayed as another. `iat`/`exp`
  * are added by jsonwebtoken.
@@ -27,11 +26,6 @@ export interface RefreshTokenPayload extends JwtPayload {
 export interface ResetTokenPayload extends JwtPayload {
   sub: string;
   type: 'reset';
-}
-export interface ManagerPinTokenPayload extends JwtPayload {
-  sub: string;
-  type: 'manager_pin';
-  org_id: string;
 }
 
 const baseOptions = { algorithm: env.JWT_ALGORITHM } satisfies SignOptions;
@@ -55,13 +49,6 @@ export function signResetToken(userId: string): string {
   return jwt.sign({ sub: userId, type: TokenType.RESET }, env.JWT_SECRET, {
     ...baseOptions,
     expiresIn: env.resetTtlSec,
-  });
-}
-
-export function signManagerPinToken(userId: string, orgId: string): string {
-  return jwt.sign({ sub: userId, type: TokenType.MANAGER_PIN, org_id: orgId }, env.JWT_SECRET, {
-    ...baseOptions,
-    expiresIn: MANAGER_PIN_TTL_MINUTES * 60,
   });
 }
 

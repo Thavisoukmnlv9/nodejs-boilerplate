@@ -7,8 +7,8 @@ import { organizationService } from '@/modules/organizations/organization.servic
 /**
  * Resolve (user, organization, membership) once per request and memoize on `req`.
  * The RBAC guards call this internally, so a route can compose
- * `authGuard → requireModule → requirePermission` and the DB context is loaded a
- * single time. Companion to `authGuard`; must run after it.
+ * `authGuard → requirePermission` and the DB context is loaded a single time.
+ * Companion to `authGuard`; must run after it.
  */
 export async function ensureAuthContext(req: Request): Promise<AuthContext> {
   if (req.authContext) return req.authContext;

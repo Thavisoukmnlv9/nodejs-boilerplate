@@ -4,9 +4,10 @@ import { BadRequestError, UnauthorizedError } from '@/common/errors';
 import { organizationRepository } from '@/modules/organizations/organization.repository';
 import { organizationService } from '@/modules/organizations/organization.service';
 import { roleService } from '@/modules/roles/role.service';
-import { entitlementService } from '@/modules/entitlements/entitlement.service';
-import { EMPTY_ENTITLEMENTS } from '@/modules/entitlements/entitlement.types';
-import type { MeOrganization, MeResponse, MeUser } from '@/modules/me/me.types';
+import type { MeEntitlements, MeOrganization, MeResponse, MeUser } from '@/modules/me/me.types';
+
+/** Subscription models were removed → entitlements are always empty (kept for SPA compat). */
+const EMPTY_ENTITLEMENTS: MeEntitlements = { modules: [], limits: {} };
 
 function toMeUser(user: User): MeUser {
   return {
@@ -64,10 +65,9 @@ export class MeService {
     }
 
     const ctx = await organizationService.loadContext(userId, orgId);
-    const [permissions, branches, entitlements] = await Promise.all([
+    const [permissions, branches] = await Promise.all([
       roleService.getPermissionCodes(ctx.membership.role_id),
       organizationService.getBranchesForMember(ctx.membership),
-      entitlementService.getEntitlements(ctx.organization.id),
     ]);
 
     return {
@@ -80,7 +80,7 @@ export class MeService {
         is_default: b.id === ctx.membership.default_branch_id,
       })),
       default_branch_id: ctx.membership.default_branch_id ?? null,
-      entitlements,
+      entitlements: EMPTY_ENTITLEMENTS,
     };
   }
 }

@@ -3,20 +3,18 @@ import { hashPassword } from '@/common/utils/password';
 import { ALL_PERMISSIONS, SYSTEM_ROLES } from '@/config/permissions';
 
 /**
- * Idempotent seed: permission catalog → system roles + grants → plans → a demo org
- * (owner + member, one branch, an active `pro` subscription enabling pos_shop +
- * inventory). Safe to run repeatedly (everything upserts on a natural key).
+ * Idempotent seed: permission catalog → system roles + grants → plan catalog → a
+ * demo org (owner + member, one branch). Safe to run repeatedly (everything upserts
+ * on a natural key).
  */
 const prisma = new PrismaClient();
 
 const PLANS = [
-  { slug: 'starter', name: 'Starter', modules: ['pos_shop', 'pos_food_service', 'pos_clothing', 'inventory'], limits: { max_branches: 1, max_users: 3 } },
-  { slug: 'growth', name: 'Growth', modules: ['pos_shop', 'pos_food_service', 'pos_clothing', 'inventory', 'chat_manager'], limits: { max_branches: 3, max_users: 10 } },
-  { slug: 'pro', name: 'Pro', modules: ['pos_shop', 'pos_food_service', 'pos_clothing', 'inventory', 'chat_manager', 'ecommerce', 'ads_manager'], limits: { max_branches: 10, max_users: 30 } },
-  { slug: 'enterprise', name: 'Enterprise', modules: ['pos_shop', 'pos_food_service', 'pos_clothing', 'inventory', 'chat_manager', 'ecommerce', 'ads_manager'], limits: {} as Record<string, number> },
+  { slug: 'starter', name: 'Starter' },
+  { slug: 'growth', name: 'Growth' },
+  { slug: 'pro', name: 'Pro' },
+  { slug: 'enterprise', name: 'Enterprise' },
 ];
-
-const ALL_MODULE_CODES = ['pos_shop', 'pos_food_service', 'pos_clothing', 'inventory', 'ecommerce', 'ads_manager', 'chat_manager'];
 
 async function seedPermissions(): Promise<void> {
   for (const p of ALL_PERMISSIONS) {
@@ -57,25 +55,11 @@ async function seedRoles(): Promise<void> {
 
 async function seedPlans(): Promise<void> {
   for (const plan of PLANS) {
-    const record = await prisma.plan.upsert({
+    await prisma.plan.upsert({
       where: { slug: plan.slug },
       update: { name: plan.name },
       create: { slug: plan.slug, name: plan.name, billing_interval: 'MONTHLY', is_active: true },
     });
-    for (const code of ALL_MODULE_CODES) {
-      await prisma.planModule.upsert({
-        where: { plan_id_module_code: { plan_id: record.id, module_code: code } },
-        update: { included: plan.modules.includes(code) },
-        create: { plan_id: record.id, module_code: code, included: plan.modules.includes(code) },
-      });
-    }
-    for (const [key, value] of Object.entries(plan.limits)) {
-      await prisma.planLimit.upsert({
-        where: { plan_id_limit_key: { plan_id: record.id, limit_key: key } },
-        update: { limit_value: value },
-        create: { plan_id: record.id, limit_key: key, limit_value: value },
-      });
-    }
   }
   console.log(`  ✓ ${PLANS.length} plans`);
 }
@@ -132,26 +116,6 @@ async function seedDemo(): Promise<void> {
     },
   });
 
-  const proPlan = await prisma.plan.findUnique({ where: { slug: 'pro' } });
-  const sub = await prisma.organizationSubscription.upsert({
-    where: { organization_id: org.id },
-    update: { status: 'ACTIVE', plan_id: proPlan?.id },
-    create: {
-      organization_id: org.id,
-      plan_id: proPlan?.id,
-      status: 'ACTIVE',
-      billing_interval: 'MONTHLY',
-      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    },
-  });
-
-  for (const code of ['pos_shop', 'inventory', 'pos_food_service']) {
-    await prisma.subscriptionModule.upsert({
-      where: { organization_subscription_id_module_code: { organization_subscription_id: sub.id, module_code: code } },
-      update: { enabled: true },
-      create: { organization_subscription_id: sub.id, module_code: code, enabled: true },
-    });
-  }
   console.log('  ✓ demo org (owner@demo.test / member@demo.test — password: Password123)');
 }
 
