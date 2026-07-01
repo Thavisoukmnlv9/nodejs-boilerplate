@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bsync
+          POSTGRES_PASSWORD: bsync_dev
+          POSTGRES_DB: business_sync_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bsync"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://bsync:bsync_dev@localhost:5432/business_sync_test?schema=public
+      REDIS_URL: redis://localhost:6379/0
+      BULLMQ_REDIS_URL: redis://localhost:6379/1
+      JWT_SECRET: ci-secret-ci-secret-ci-secret-0123456789
+      RUN_INTEGRATION: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Migrate + seed test DB
+        run: |
+          npx prisma migrate deploy
+          npm run prisma:seed
+
+      - name: Test (unit + integration)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Docker build
+        run: docker build -f docker/Dockerfile -t business-sync-api:${{ github.sha }} .
