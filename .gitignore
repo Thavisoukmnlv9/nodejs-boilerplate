@@ -7,8 +7,8 @@ dist/
 
 # Env & secrets
 .env
-.env.*
 !.env.example
+!.env.prod
 
 # Runtime data (git-ignored volumes)
 logs/

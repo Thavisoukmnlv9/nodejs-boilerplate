@@ -1,4 +1,11 @@
-import type { Entitlements } from '@/modules/entitlements/entitlement.types';
+/**
+ * Entitlements surfaced by /me. The subscription models that populated
+ * modules/limits were removed; the field stays (empty) for SPA wire-compat.
+ */
+export interface MeEntitlements {
+  modules: string[];
+  limits: Record<string, number>;
+}
 
 export interface MeUser {
   id: string;
