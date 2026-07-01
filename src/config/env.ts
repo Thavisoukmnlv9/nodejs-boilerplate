@@ -59,7 +59,7 @@ const schema = z
     COOKIE_DOMAIN: z.string().optional(),
 
     // CORS
-    ALLOWED_ORIGINS: zStringList(['http://localhost:3100', 'http://localhost:5173']),
+    ALLOWED_ORIGINS: zStringList(['http://localhost:3100', 'http://localhost:5173', 'http://localhost:8080']),
 
     // Database
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
