@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { AuthService } from '@/modules/auth/auth.service';
 import type { AuthRepository } from '@/modules/auth/auth.repository';
 import { hashPassword } from '@/common/utils/password';

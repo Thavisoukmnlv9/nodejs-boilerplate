@@ -1,6 +1,7 @@
 // @ts-check
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
@@ -21,7 +22,6 @@ export default tseslint.config(
       ecmaVersion: 2022,
       sourceType: 'module',
     },
-    extends: ['prettier'],
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -53,4 +53,5 @@ export default tseslint.config(
     files: ['prisma/**/*.ts', 'scripts/**/*.ts'],
     rules: { 'no-console': 'off' },
   },
+  prettier,
 );
