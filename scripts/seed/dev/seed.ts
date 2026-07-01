@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
+import { MODULE_CODES } from '@/config/permissions';
 import { seedPermissions } from './permissions';
 import { seedRoles } from './roles';
 import { seedUsers, DEMO_USERS } from './users';
@@ -22,12 +23,13 @@ interface DemoOrgSeed {
   currency_code: string;
 }
 
+/** One demo org per catalog module (`MODULE_CODES` in `src/config/permissions.ts`) — keeps the branch's vertical tied to a real module instead of an ad-hoc label. */
 const DEMO_ORGS: DemoOrgSeed[] = [
-  { id: 'org_demo_shop', name: 'Demo Shop Co.', slug: 'demo', vertical: 'shop', currency_code: 'LAK' },
-  { id: 'org_demo_foods', name: 'Acme Foods', slug: 'acme-foods', vertical: 'food_service', currency_code: 'LAK' },
-  { id: 'org_demo_clothing', name: 'Urban Thread', slug: 'urban-thread', vertical: 'clothing', currency_code: 'THB' },
-  { id: 'org_demo_ecommerce', name: 'North Mart Online', slug: 'north-mart', vertical: 'ecommerce', currency_code: 'USD' },
-  { id: 'org_demo_chat', name: 'ChatLine Support', slug: 'chatline', vertical: 'chat_manager', currency_code: 'USD' },
+  { id: 'org_demo_shop', name: 'Demo Shop Co.', slug: 'demo', vertical: MODULE_CODES[0], currency_code: 'LAK' },
+  { id: 'org_demo_foods', name: 'Acme Foods', slug: 'acme-foods', vertical: MODULE_CODES[1], currency_code: 'LAK' },
+  { id: 'org_demo_clothing', name: 'Urban Thread', slug: 'urban-thread', vertical: MODULE_CODES[2], currency_code: 'THB' },
+  { id: 'org_demo_ecommerce', name: 'North Mart Online', slug: 'north-mart', vertical: MODULE_CODES[4], currency_code: 'USD' },
+  { id: 'org_demo_chat', name: 'ChatLine Support', slug: 'chatline', vertical: MODULE_CODES[6], currency_code: 'USD' },
 ];
 
 async function seedOrganizationsAndBranches(): Promise<Map<string, { orgId: string; branchId: string }>> {
@@ -111,7 +113,7 @@ async function seedSessions(demoOrgId: string, idByEmail: Map<string, string>): 
 async function seedEntitlementOverrides(orgIds: Map<string, { orgId: string; branchId: string }>): Promise<void> {
   const overrides: { slug: string; kind: string; code: string; enabled?: boolean; limit_value?: number }[] = [
     { slug: 'demo', kind: 'feature', code: 'advanced_reports', enabled: true },
-    { slug: 'acme-foods', kind: 'module', code: 'pos_food_service', enabled: true },
+    { slug: 'acme-foods', kind: 'module', code: MODULE_CODES[1], enabled: true },
     { slug: 'urban-thread', kind: 'limit', code: 'max_branches', limit_value: 10 },
     { slug: 'north-mart', kind: 'feature', code: 'ecommerce_reviews', enabled: true },
     { slug: 'chatline', kind: 'limit', code: 'max_agents', limit_value: 25 },

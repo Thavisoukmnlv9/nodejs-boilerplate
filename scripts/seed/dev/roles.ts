@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/generated/prisma/client';
+import type { PrismaClient } from '@/generated/prisma/client';
 import { ALL_PERMISSIONS, SYSTEM_ROLES } from '@/config/permissions';
 
 /** Upserts the 5 system roles (Owner/Admin/Manager/Member/Cashier) and resets their grants. */

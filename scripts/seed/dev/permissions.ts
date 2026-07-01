@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/generated/prisma/client';
+import type { PrismaClient } from '@/generated/prisma/client';
 import { ALL_PERMISSIONS } from '@/config/permissions';
 
 /** Upserts the full permission catalog (defined in `src/config/permissions.ts`). */

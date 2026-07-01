@@ -1,15 +1,3 @@
-/**
- * RBAC catalog — the full permission set we seed. Structured so that ADDING A
- * MODULE = add its codes + grant them to roles; nothing else changes.
- *
- * Codes and grants are copied from the reference seed
- * (`business-sync-backend-services/scripts/seeds/{permission,role}.py`). Shape is
- * `{module}.{action}` or `{module}.{resource}.{action}`. Covers the full
- * platform.* core set, every POS vertical (pos_shop, pos_food_service,
- * pos_clothing), inventory.*, and the remaining verticals (ecommerce,
- * ads_manager, chat_manager).
- */
-
 export interface PermissionSeed {
   code: string;
   module: string;
@@ -36,6 +24,10 @@ export const MODULE_CODES = [
   'chat_manager',
 ] as const;
 export type ModuleCode = (typeof MODULE_CODES)[number];
+
+/** Generic actions granted per module — every module gets the identical shape. */
+export const MODULE_ACTIONS = ['view', 'create', 'update', 'delete', 'manage', 'reports'] as const;
+export type ModuleAction = (typeof MODULE_ACTIONS)[number];
 
 const PLATFORM_CODES = [
   'platform.users.read',
@@ -80,157 +72,6 @@ const PLATFORM_CODES = [
   'platform.reports.export',
 ];
 
-const POS_SHOP_CODES = [
-  'pos_shop.sell',
-  'pos_shop.refund',
-  'pos_shop.manage_session',
-  'pos_shop.view_reports',
-  'pos_shop.manage',
-  'pos_shop.products',
-  'pos_shop.variants',
-  'pos_shop.categories',
-  'pos_shop.barcodes',
-  'pos_shop.inventory',
-  'pos_shop.inventory.adjust',
-  'pos_shop.inventory.receive',
-  'pos_shop.inventory.damage',
-  'pos_shop.inventory.damage.approve',
-  'pos_shop.inventory.settings',
-  'pos_shop.stock_transfers',
-  'pos_shop.purchase_orders',
-  'pos_shop.suppliers',
-  'pos_shop.customers',
-  'pos_shop.loyalty',
-  'pos_shop.pricing',
-  'pos_shop.promotions',
-  'pos_shop.branches',
-  'pos_shop.devices',
-  'pos_shop.shifts',
-  'pos_shop.tax',
-  'pos_shop.settings',
-  'pos_shop.bill_config',
-  'pos_shop.customer_orders',
-  'pos_shop.holds',
-  'pos_shop.sales',
-  'pos_shop.returns',
-  'pos_shop.reports',
-  'pos_shop.dashboard',
-  'pos_shop.audit',
-  'pos_shop.alerts',
-  'pos_shop.trash_view',
-  'pos_shop.restore',
-  'pos_shop.permanent_delete',
-];
-
-const POS_FOOD_SERVICE_CODES = [
-  'pos_food_service.sell',
-  'pos_food_service.refund',
-  'pos_food_service.manage_session',
-  'pos_food_service.manage',
-  'pos_food_service.menu_items',
-  'pos_food_service.modifiers',
-  'pos_food_service.categories',
-  'pos_food_service.tables',
-  'pos_food_service.reservations',
-  'pos_food_service.kitchen_display',
-  'pos_food_service.inventory',
-  'pos_food_service.suppliers',
-  'pos_food_service.customers',
-  'pos_food_service.pricing',
-  'pos_food_service.promotions',
-  'pos_food_service.branches',
-  'pos_food_service.devices',
-  'pos_food_service.shifts',
-  'pos_food_service.tax',
-  'pos_food_service.settings',
-  'pos_food_service.sales',
-  'pos_food_service.returns',
-  'pos_food_service.reports',
-  'pos_food_service.dashboard',
-];
-
-const POS_CLOTHING_CODES = [
-  'pos_clothing.sell',
-  'pos_clothing.refund',
-  'pos_clothing.manage_session',
-  'pos_clothing.manage',
-  'pos_clothing.products',
-  'pos_clothing.variants',
-  'pos_clothing.categories',
-  'pos_clothing.sizes',
-  'pos_clothing.colors',
-  'pos_clothing.barcodes',
-  'pos_clothing.inventory',
-  'pos_clothing.stock_transfers',
-  'pos_clothing.purchase_orders',
-  'pos_clothing.suppliers',
-  'pos_clothing.customers',
-  'pos_clothing.loyalty',
-  'pos_clothing.pricing',
-  'pos_clothing.promotions',
-  'pos_clothing.branches',
-  'pos_clothing.devices',
-  'pos_clothing.shifts',
-  'pos_clothing.tax',
-  'pos_clothing.settings',
-  'pos_clothing.sales',
-  'pos_clothing.returns',
-  'pos_clothing.reports',
-  'pos_clothing.dashboard',
-];
-
-const ECOMMERCE_CODES = [
-  'ecommerce.storefront.manage',
-  'ecommerce.products',
-  'ecommerce.categories',
-  'ecommerce.orders',
-  'ecommerce.orders.fulfill',
-  'ecommerce.orders.cancel',
-  'ecommerce.shipping',
-  'ecommerce.payments',
-  'ecommerce.customers',
-  'ecommerce.discounts',
-  'ecommerce.reviews',
-  'ecommerce.reviews.moderate',
-  'ecommerce.inventory',
-  'ecommerce.settings',
-  'ecommerce.reports',
-  'ecommerce.dashboard',
-];
-
-const ADS_MANAGER_CODES = [
-  'ads_manager.campaigns',
-  'ads_manager.campaigns.create',
-  'ads_manager.campaigns.pause',
-  'ads_manager.campaigns.delete',
-  'ads_manager.audiences',
-  'ads_manager.creatives',
-  'ads_manager.budget.manage',
-  'ads_manager.billing.read',
-  'ads_manager.reports',
-  'ads_manager.dashboard',
-];
-
-const CHAT_MANAGER_CODES = [
-  'chat_manager.conversations.read',
-  'chat_manager.conversations.reply',
-  'chat_manager.conversations.assign',
-  'chat_manager.conversations.close',
-  'chat_manager.templates',
-  'chat_manager.automation',
-  'chat_manager.agents.manage',
-  'chat_manager.reports',
-  'chat_manager.settings',
-];
-
-const INVENTORY_CODES = [
-  'inventory.view',
-  'inventory.adjust',
-  'inventory.transfer',
-  'inventory.approve_transfer',
-  'inventory.view_ledger',
-];
-
 /** Turn `pos_shop.inventory.adjust` into a readable "Pos shop — inventory adjust". */
 function humanize(code: string): string {
   const [mod, ...rest] = code.split('.');
@@ -243,15 +84,14 @@ function toSeeds(codes: string[]): PermissionSeed[] {
   return codes.map((code) => ({ code, module: code.split('.')[0] ?? 'platform', description: humanize(code) }));
 }
 
+/** `{module}.view`, `{module}.create`, ... for one entry per `MODULE_ACTIONS`. */
+function moduleCodes(module: ModuleCode): string[] {
+  return MODULE_ACTIONS.map((action) => `${module}.${action}`);
+}
+
 export const ALL_PERMISSIONS: PermissionSeed[] = [
   ...toSeeds(PLATFORM_CODES),
-  ...toSeeds(POS_SHOP_CODES),
-  ...toSeeds(POS_FOOD_SERVICE_CODES),
-  ...toSeeds(POS_CLOTHING_CODES),
-  ...toSeeds(INVENTORY_CODES),
-  ...toSeeds(ECOMMERCE_CODES),
-  ...toSeeds(ADS_MANAGER_CODES),
-  ...toSeeds(CHAT_MANAGER_CODES),
+  ...MODULE_CODES.flatMap((module) => toSeeds(moduleCodes(module))),
 ];
 
 export const ALL_PERMISSION_CODES: string[] = ALL_PERMISSIONS.map((p) => p.code);
@@ -270,7 +110,7 @@ const MEMBER_GRANTS = [
   'platform.notifications.preferences',
 ];
 
-const CASHIER_GRANTS = ['pos_shop.sell', 'pos_shop.refund', 'pos_shop.customer_orders'];
+const CASHIER_GRANTS = ['pos_shop.view', 'pos_shop.create', 'pos_shop.update'];
 
 /**
  * System roles (global: organization_id = null, is_system = true). Owner gets

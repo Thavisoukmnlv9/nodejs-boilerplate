@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/generated/prisma/client';
+import type { PrismaClient } from '@/generated/prisma/client';
 import { hashPassword } from '@/common/utils/password';
 
 export interface DemoUserSeed {
