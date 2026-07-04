@@ -20,7 +20,7 @@ export interface RoleSeed {
   grants: 'ALL' | string[];
 }
 
-/** `pos_shop.inventory.adjust` → "Pos shop — inventory adjust". */
+/** `example.reports` → "Example — reports". */
 export function humanize(code: string): string {
   const [mod, ...rest] = code.split('.');
   const module = (mod ?? '').replace(/_/g, ' ');
@@ -32,7 +32,7 @@ export function permissionSeedsFromCodes(codes: string[]): PermissionSeed[] {
   return codes.map((code) => ({ code, module: code.split('.')[0] ?? 'platform', description: humanize(code) }));
 }
 
-/** `{module}.{action}` for each action, e.g. `pos_shop.view`, `pos_shop.create`… */
+/** `{module}.{action}` for each action, e.g. `example.view`, `example.create`… */
 export function moduleActionCodes(module: string, actions: readonly string[]): string[] {
   return actions.map((action) => `${module}.${action}`);
 }

@@ -69,9 +69,9 @@ export class OrganizationRepository extends BaseRepository {
         data: {
           name: input.name,
           slug,
-          currency_code: input.currency_code ?? 'LAK',
-          locale: input.locale ?? 'lo-LA',
-          timezone: input.timezone ?? 'Asia/Vientiane',
+          currency_code: input.currency_code ?? 'USD',
+          locale: input.locale ?? 'en-US',
+          timezone: input.timezone ?? 'UTC',
         },
       });
 

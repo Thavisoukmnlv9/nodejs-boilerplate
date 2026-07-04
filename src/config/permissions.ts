@@ -2,16 +2,12 @@ import { definePermissionCatalog, type PermissionSeed, type RoleSeed } from '@/a
 
 export type { PermissionSeed, RoleSeed };
 
-/** Vertical/module codes — a reference catalog for permission code prefixes. */
-export const MODULE_CODES = [
-  'pos_shop',
-  'pos_food_service',
-  'pos_clothing',
-  'inventory',
-  'ecommerce',
-  'ads_manager',
-  'chat_manager',
-] as const;
+/**
+ * Business-module codes — one generic `example` module ships with the starter to
+ * demonstrate the module → permission → nav pattern. Add your own module codes
+ * here; each is expanded across `MODULE_ACTIONS` into permission codes.
+ */
+export const MODULE_CODES = ['example'] as const;
 export type ModuleCode = (typeof MODULE_CODES)[number];
 
 /** Generic actions granted per module — every module gets the identical shape. */
@@ -88,7 +84,7 @@ const MEMBER_GRANTS = [
   'platform.notifications.preferences',
 ];
 
-const CASHIER_GRANTS = ['pos_shop.view', 'pos_shop.create', 'pos_shop.update'];
+const CASHIER_GRANTS = ['example.view', 'example.create', 'example.update'];
 
 /**
  * System roles (global: organization_id = null, is_system = true). Owner gets
@@ -105,13 +101,13 @@ export const SYSTEM_ROLES: RoleSeed[] = [
   {
     id: 'role_admin',
     name: 'Admin',
-    description: 'Manage users, settings, products, and reports. Cannot transfer ownership.',
+    description: 'Manage users, settings, and reports. Cannot transfer ownership.',
     grants: ALL_PERMISSION_CODES.filter((c) => !DANGER_ZONE_CODES.includes(c)),
   },
   {
     id: 'role_manager',
     name: 'Manager',
-    description: 'All Admin powers plus PIN-gated POS overrides.',
+    description: 'All Admin powers plus elevated operational overrides.',
     grants: ALL_PERMISSION_CODES.filter((c) => !DANGER_ZONE_CODES.includes(c)),
   },
   {
@@ -123,7 +119,7 @@ export const SYSTEM_ROLES: RoleSeed[] = [
   {
     id: 'role_cashier',
     name: 'Cashier',
-    description: 'Run the shop POS — sell, refund, and view their own sessions.',
+    description: 'Operate the example module — create and update records within their branch.',
     grants: CASHIER_GRANTS,
   },
 ];

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { paginationQuery } from '@/common/utils/pagination';
 
-export const BRANCH_VERTICALS = ['FOOD_SERVICE', 'SHOP', 'CLOTHING'] as const;
-export const BRANCH_CURRENCIES = ['LAK', 'THB', 'USD', 'EUR'] as const;
+export const BRANCH_VERTICALS = ['GENERAL', 'RETAIL', 'SERVICE'] as const;
+export const BRANCH_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY'] as const;
 
 const code = z
   .string()

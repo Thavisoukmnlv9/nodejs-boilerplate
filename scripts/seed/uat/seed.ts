@@ -64,13 +64,13 @@ async function seedQaOrg(): Promise<void> {
   const org = await prisma.organization.upsert({
     where: { slug: 'uat-qa' },
     update: {},
-    create: { id: 'org_uat_qa', name: 'UAT QA Org', slug: 'uat-qa', currency_code: 'LAK', locale: 'lo-LA' },
+    create: { id: 'org_uat_qa', name: 'UAT QA Org', slug: 'uat-qa', currency_code: 'USD', locale: 'en-US' },
   });
 
   const branch = await prisma.branch.upsert({
     where: { organization_id_code: { organization_id: org.id, code: 'MAIN' } },
     update: {},
-    create: { id: 'branch_uat_qa_main', organization_id: org.id, code: 'MAIN', name: 'QA Main Branch', vertical: 'shop', is_main: true },
+    create: { id: 'branch_uat_qa_main', organization_id: org.id, code: 'MAIN', name: 'QA Main Branch', vertical: 'GENERAL', is_main: true },
   });
 
   for (const u of UAT_USERS) {

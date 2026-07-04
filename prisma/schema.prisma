@@ -93,9 +93,9 @@ model Organization {
   slug          String  @unique
   logo_url      String?
   brand_color   String?
-  timezone      String  @default("Asia/Vientiane")
-  locale        String  @default("lo-LA") @db.VarChar(10)
-  currency_code String  @default("LAK") @db.VarChar(3)
+  timezone      String  @default("UTC")
+  locale        String  @default("en-US") @db.VarChar(10)
+  currency_code String  @default("USD") @db.VarChar(3)
   tax_rate_bps  Int     @default(0)
 
   business_legal_name   String?
@@ -175,7 +175,7 @@ model MemberBranchAccess {
 
 model Permission {
   id          String   @id @default(cuid())
-  code        String   @unique // e.g. platform.roles.manage, pos_shop.sell
+  code        String   @unique // e.g. platform.roles.manage, example.view
   module      String
   description String?
   created_at  DateTime @default(now())
@@ -257,9 +257,9 @@ model Branch {
   is_main            Boolean @default(false)
   phone              String?
   email              String?
-  timezone           String  @default("Asia/Vientiane")
-  currency_code      String  @default("LAK") @db.VarChar(3)
-  locale             String  @default("lo-LA") @db.VarChar(10)
+  timezone           String  @default("UTC")
+  currency_code      String  @default("USD") @db.VarChar(3)
+  locale             String  @default("en-US") @db.VarChar(10)
   tax_rate_bps       Int     @default(0)
   service_fee_bps    Int     @default(0)
   prices_include_tax Boolean @default(true)

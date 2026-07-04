@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const CURRENCIES = ['LAK', 'THB', 'USD', 'EUR'] as const;
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY'] as const;
 
 /** Onboarding: a freshly-registered (org-less) user creates their org and becomes Owner. */
 export const createOrganizationSchema = z.object({
