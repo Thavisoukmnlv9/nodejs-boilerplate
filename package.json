@@ -2,10 +2,11 @@
   "name": "business-sync-api",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.6.0",
   "description": "Business Sync — production Node/Express/Prisma REST API (platform-core reimplementation of the FastAPI reference service).",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "main": "dist/server.js",
   "type": "module",
@@ -76,7 +77,7 @@
     "@types/jest": "30.0.0",
     "@types/jsonwebtoken": "9.0.10",
     "@types/multer": "2.2.0",
-    "@types/node": "26.1.0",
+    "@types/node": "24.13.2",
     "@types/pg": "8.20.0",
     "@types/supertest": "7.2.0",
     "@types/swagger-ui-express": "4.1.8",
