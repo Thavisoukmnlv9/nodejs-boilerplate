@@ -2,13 +2,15 @@ import { z } from 'zod';
 import { paginationQuery } from '@/common/utils/pagination';
 
 /** Users == organization members (the admin portal's "Users" page). */
+export const MEMBER_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING'] as const;
+
 export const listUsersQuery = paginationQuery.extend({
   q: z.string().trim().min(1).max(120).optional(),
+  status: z.enum(MEMBER_STATUSES).optional(),
+  role_id: z.string().min(1).optional(),
 });
 
-export const userIdParam = z.object({
-  id: z.string().min(1),
-});
+export const userIdParam = z.object({ id: z.string().min(1) });
 
 export const inviteUserSchema = z.object({
   email: z.string().email(),

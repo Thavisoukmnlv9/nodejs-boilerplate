@@ -36,6 +36,15 @@ export interface MeBranch {
   is_default: boolean;
 }
 
+/** A compact stored policy, shipped so the SPA can mirror the server's can() for UI gating. */
+export interface MePolicy {
+  effect: 'ALLOW' | 'DENY';
+  action: string;
+  subject: string;
+  conditions: unknown | null;
+  role_id: string | null;
+}
+
 /** GET /api/v1/me — the SPA's single bootstrap call. */
 export interface MeResponse {
   user: MeUser;
@@ -43,5 +52,6 @@ export interface MeResponse {
   permissions: string[];
   branches: MeBranch[];
   default_branch_id: string | null;
+  policies: MePolicy[];
   entitlements: MeEntitlements;
 }

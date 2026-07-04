@@ -34,6 +34,14 @@ usersRoutes.post(
   asyncHandler(usersController.create),
 );
 
+usersRoutes.post(
+  '/:id/resend-invite',
+  authGuard,
+  requirePermission('platform.users.invite'),
+  validate({ params: userIdParam }),
+  asyncHandler(usersController.resendInvite),
+);
+
 usersRoutes.patch(
   '/:id',
   authGuard,

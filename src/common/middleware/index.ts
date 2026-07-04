@@ -13,4 +13,5 @@ export {
 export { authGuard } from '@/common/middleware/authGuard';
 export { loadUserOrg, ensureAuthContext } from '@/common/middleware/loadUserOrg';
 export { requirePermission, requireAnyPermission } from '@/common/middleware/rbac';
+export { requirePolicy, getBranchScope } from '@/access';
 export { metricsMiddleware, metricsHandler, registry } from '@/common/middleware/metrics';

@@ -12,9 +12,17 @@ import {
   verifyResetToken,
 } from '@/common/utils/token';
 import { sendPasswordResetEmail } from '@/infra/email/email.service';
+import { hashOpaqueToken } from '@/access/tokens';
 import { type AuthRepository, authRepository } from '@/modules/auth/auth.repository';
+import { usersRepository } from '@/modules/users/users.repository';
 import type { IssuedTokens, RequestMeta, SessionResponse } from '@/modules/auth/auth.types';
-import type { ForgotPasswordInput, LoginInput, RegisterInput, ResetPasswordInput } from '@/modules/auth/auth.schema';
+import type {
+  AcceptInviteInput,
+  ForgotPasswordInput,
+  LoginInput,
+  RegisterInput,
+  ResetPasswordInput,
+} from '@/modules/auth/auth.schema';
 
 /**
  * Auth business logic. Refresh tokens are STATEFUL: every login/register persists a
@@ -162,6 +170,26 @@ export class AuthService {
     await this.repo.setPassword(user.id, await hashPassword(input.new_password));
     // Force re-login everywhere after a password change.
     await this.repo.revokeAllForUser(user.id);
+  }
+
+  /**
+   * Accept an org invite: validate the one-time token (hash + expiry), set the
+   * user's password, mark the membership accepted, and auto-login — same response
+   * shape as /auth/login, scoped to the inviting org.
+   */
+  async acceptInvite(input: AcceptInviteInput, meta: RequestMeta): Promise<IssuedTokens> {
+    const member = await usersRepository.findByInviteTokenHash(hashOpaqueToken(input.token));
+    if (!member || !member.user_id || !member.organization_id) {
+      throw new BadRequestError('Invalid or already-accepted invite');
+    }
+    if (member.invitation_expires_at && member.invitation_expires_at.getTime() < Date.now()) {
+      throw new BadRequestError('This invite has expired');
+    }
+    const passwordHash = await hashPassword(input.password);
+    await usersRepository.acceptInvite(member.id, member.user_id, passwordHash, input.name);
+    const tokens = await this.issueSession(member.user_id, member.organization_id, meta);
+    await this.repo.touchLastLogin(member.user_id);
+    return tokens;
   }
 
   async listSessions(userId: string): Promise<SessionResponse[]> {

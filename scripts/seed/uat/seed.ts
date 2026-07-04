@@ -80,9 +80,9 @@ async function seedQaOrg(): Promise<void> {
       create: { id: u.id, email: u.email, name: u.name, password_hash: password, status: 'ACTIVE' },
     });
 
-    await prisma.organizationMember.upsert({
+    const member = await prisma.organizationMember.upsert({
       where: { user_id_organization_id: { user_id: u.id, organization_id: org.id } },
-      update: { role_id: u.roleId, is_owner: u.roleId === 'role_owner', accepted_at: new Date() },
+      update: { role_id: u.roleId, is_owner: u.roleId === 'role_owner', accepted_at: new Date(), default_branch_id: branch.id },
       create: {
         id: `member_${u.id}`,
         user_id: u.id,
@@ -90,9 +90,13 @@ async function seedQaOrg(): Promise<void> {
         role_id: u.roleId,
         is_owner: u.roleId === 'role_owner',
         accepted_at: new Date(),
-        branch_ids: [branch.id],
         default_branch_id: branch.id,
       },
+    });
+    await prisma.memberBranchAccess.upsert({
+      where: { member_id_branch_id: { member_id: member.id, branch_id: branch.id } },
+      update: {},
+      create: { member_id: member.id, branch_id: branch.id },
     });
 
     await prisma.session.upsert({

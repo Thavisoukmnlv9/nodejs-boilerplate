@@ -10,6 +10,7 @@ import {
 } from '@/common/middleware';
 import { authController } from '@/modules/auth/auth.controller';
 import {
+  acceptInviteSchema,
   forgotPasswordSchema,
   loginSchema,
   logoutSchema,
@@ -34,6 +35,12 @@ authRoutes.post(
   asyncHandler(authController.forgotPassword),
 );
 authRoutes.post('/reset-password', validate({ body: resetPasswordSchema }), asyncHandler(authController.resetPassword));
+authRoutes.post(
+  '/accept-invite',
+  registerLimiter,
+  validate({ body: acceptInviteSchema }),
+  asyncHandler(authController.acceptInvite),
+);
 authRoutes.get('/sessions', authGuard, asyncHandler(authController.listSessions));
 authRoutes.delete(
   '/sessions/:id',

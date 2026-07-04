@@ -7,9 +7,13 @@ export interface AuthPrincipal {
   orgId: string | null;
 }
 
-/** The fully-resolved request context loaded from the DB by `loadUserOrg`. */
+/**
+ * The fully-resolved request context loaded from the DB by `loadUserOrg`.
+ * `membership.branch_access` is included by `organizationService.loadContext`
+ * so the access library can resolve branch scope without a second query.
+ */
 export interface AuthContext {
   user: User;
   organization: Organization;
-  membership: OrganizationMember;
+  membership: OrganizationMember & { branch_access?: { branch_id: string }[] };
 }

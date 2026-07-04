@@ -14,16 +14,21 @@ export const usersController = {
   },
 
   async create(req: Request, res: Response): Promise<void> {
-    const member = await usersService.invite(req.authContext!.organization.id, req.auth!.userId, req.body);
-    res.status(201).json(member);
+    const issued = await usersService.invite(req.authContext!.organization.id, req.auth!.userId, req.body);
+    res.status(201).json(issued);
   },
 
   async update(req: Request, res: Response): Promise<void> {
-    res.json(await usersService.update(req.authContext!.organization.id, req.params.id!, req.body));
+    const orgId = req.authContext!.organization.id;
+    res.json(await usersService.update(orgId, req.params.id!, req.auth!.userId, req.body));
   },
 
   async remove(req: Request, res: Response): Promise<void> {
-    await usersService.remove(req.authContext!.organization.id, req.params.id!);
+    await usersService.remove(req.authContext!.organization.id, req.params.id!, req.auth!.userId);
     res.status(204).send();
+  },
+
+  async resendInvite(req: Request, res: Response): Promise<void> {
+    res.status(201).json(await usersService.resendInvite(req.authContext!.organization.id, req.params.id!));
   },
 };

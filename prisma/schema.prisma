@@ -1,3 +1,14 @@
+// Access-control platform schema (v2 redesign).
+//
+// Design rule: SOFT-DELETE IDENTITY, HARD-DELETE CONFIGURATION.
+//   • deleted_at kept on: User, OrganizationMember, Organization, Session, File
+//   • hard-deleted (no deleted_at): Role, RolePermission, Permission, Branch,
+//     EntitlementOverride, Policy — killing the soft-delete × unique-index class
+//     of bug and the "deleted row still grants permission" hazard in the guard.
+// Multi-branch access is a real join table (MemberBranchAccess), not a scalar
+// String[]; default_branch_id is a real FK. ABAC is RBAC (role → permission
+// codes) + branch scope + a stored Policy layer evaluated by the access library.
+
 generator client {
   provider      = "prisma-client"
   output        = "../src/generated/prisma"
@@ -8,23 +19,36 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PolicyEffect {
+  ALLOW
+  DENY
+}
+
 // ─── Platform Core: Auth & Identity ──────────────────────────────────────────
 
 model User {
-  id                  String    @id @default(cuid())
-  email               String?   @unique
-  password_hash       String?
+  id                  String     @id @default(cuid())
+  email               String     @unique // normalized lowercase in the service layer
+  password_hash       String? // null until an invite is accepted / password set
   name                String?
   avatar_url          String?
   phone               String?
-  status              String    @default("ACTIVE") // ACTIVE | INACTIVE
+  status              UserStatus @default(ACTIVE)
   email_verified_at   DateTime?
   last_login_at       DateTime?
-  mfa_enabled         Boolean   @default(false)
-  is_platform_staff   Boolean   @default(false)
-  platform_staff_role String? // owner | operator | finance | support (null when not platform staff)
-  created_at          DateTime  @default(now())
-  updated_at          DateTime  @updatedAt
+  mfa_enabled         Boolean    @default(false)
+  is_platform_staff   Boolean    @default(false)
+  platform_staff_role String? // owner | operator | finance | support (null when not staff)
+  created_at          DateTime   @default(now())
+  updated_at          DateTime   @updatedAt
   deleted_at          DateTime?
 
   sessions             Session[]
@@ -37,9 +61,9 @@ model User {
 
 model Session {
   id                 String    @id @default(cuid())
-  user_id            String?
-  organization_id    String? // current org when session created
-  refresh_token_hash String? // hashed refresh token for rotation
+  user_id            String
+  organization_id    String? // current org when session created (null before onboarding)
+  refresh_token_hash String? // sha256 of the issued refresh token (rotation/binding)
   expires_at         DateTime?
   revoked_at         DateTime?
   device_info        String?
@@ -52,7 +76,7 @@ model Session {
   deleted_at         DateTime?
   updated_at         DateTime  @default(now()) @updatedAt
 
-  user         User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organization_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
@@ -65,8 +89,8 @@ model Session {
 
 model Organization {
   id            String  @id @default(cuid())
-  name          String?
-  slug          String? @unique
+  name          String
+  slug          String  @unique
   logo_url      String?
   brand_color   String?
   timezone      String  @default("Asia/Vientiane")
@@ -88,6 +112,7 @@ model Organization {
   members               OrganizationMember[]
   branches              Branch[]
   roles                 Role[]
+  policies              Policy[]
   files                 File[]
   entitlement_overrides EntitlementOverride[]
 
@@ -97,18 +122,16 @@ model Organization {
 
 model OrganizationMember {
   id                    String    @id @default(cuid())
-  user_id               String?
-  organization_id       String?
+  user_id               String
+  organization_id       String
   role_id               String?
   is_owner              Boolean   @default(false)
   invited_at            DateTime  @default(now())
   invited_by_id         String?
   invitation_expires_at DateTime?
   invitation_token_hash String?
-  accepted_at           DateTime? // null = pending invite
-  role_expires_at       DateTime?
+  accepted_at           DateTime? // null = pending invite (derived status PENDING)
   last_active_at        DateTime?
-  branch_ids            String[]  @default([])
   default_branch_id     String?
   staff_id              String?
   staff_title           String?
@@ -117,28 +140,46 @@ model OrganizationMember {
   updated_at            DateTime  @default(now()) @updatedAt
   deleted_at            DateTime?
 
-  user         User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  organization Organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  role         Role?         @relation(fields: [role_id], references: [id], onDelete: Restrict)
-  invited_by   User?         @relation("InvitedBy", fields: [invited_by_id], references: [id], onDelete: SetNull)
+  user           User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization   Organization         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  role           Role?                @relation(fields: [role_id], references: [id], onDelete: Restrict)
+  invited_by     User?                @relation("InvitedBy", fields: [invited_by_id], references: [id], onDelete: SetNull)
+  default_branch Branch?              @relation("MemberDefaultBranch", fields: [default_branch_id], references: [id], onDelete: SetNull)
+  branch_access  MemberBranchAccess[]
 
   @@unique([user_id, organization_id])
   @@index([organization_id])
+  @@index([organization_id, role_id])
   @@index([invitation_token_hash])
   @@index([accepted_at])
   @@map("organization_member")
 }
 
-// ─── Platform Core: Roles & Permissions ──────────────────────────────────────
+/// Which branches a member may operate. Replaces the old scalar `branch_ids String[]`.
+/// FKs give referential integrity (branch delete cascades access rows) + the reverse
+/// "who can operate branch X" query for the branch detail UI.
+model MemberBranchAccess {
+  member_id  String
+  branch_id  String
+  created_at DateTime @default(now())
+
+  member OrganizationMember @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  branch Branch             @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  @@id([member_id, branch_id])
+  @@index([branch_id])
+  @@map("member_branch_access")
+}
+
+// ─── Platform Core: Roles & Permissions (hard-delete) ────────────────────────
 
 model Permission {
-  id          String    @id @default(cuid())
-  code        String?   @unique // e.g. pos_shop.sell, inventory.adjust
-  module      String?
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g. platform.roles.manage, pos_shop.sell
+  module      String
   description String?
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @default(now()) @updatedAt
-  deleted_at  DateTime?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
 
   role_permissions RolePermission[]
 
@@ -147,21 +188,18 @@ model Permission {
 
 model Role {
   // organization_id null = global system role; set = custom role owned by that org.
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   organization_id String?
-  name            String?
+  name            String
   description     String?
-  is_system       Boolean   @default(false)
-  parent_role_id  String?
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-  deleted_at      DateTime?
+  is_system       Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   permissions  RolePermission[]
   members      OrganizationMember[]
+  policies     Policy[]
   organization Organization?        @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  parent_role  Role?                @relation("RoleHierarchy", fields: [parent_role_id], references: [id], onDelete: SetNull)
-  child_roles  Role[]               @relation("RoleHierarchy")
 
   @@unique([organization_id, name])
   @@index([organization_id])
@@ -171,9 +209,7 @@ model Role {
 model RolePermission {
   role_id       String
   permission_id String
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @default(now()) @updatedAt
-  deleted_at    DateTime?
+  created_at    DateTime @default(now())
 
   role       Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
@@ -182,22 +218,45 @@ model RolePermission {
   @@map("role_permission")
 }
 
-// ─── Platform Core: Branches ─────────────────────────────────────────────────
+// ─── ABAC: Stored policy layer ───────────────────────────────────────────────
+
+/// Attribute-based rules layered on top of RBAC permission codes. Evaluated by the
+/// access library's can() seam AFTER the code check, DENY-wins. `conditions` is a
+/// small JSON matcher over { principal, resource } (see src/access/policy.ts).
+model Policy {
+  id              String       @id @default(cuid())
+  organization_id String
+  role_id         String? // null = applies to every member; set = only when acting under this role
+  effect          PolicyEffect
+  action          String // read | create | update | delete | manage | *
+  subject         String // Branch | Role | User | Policy | *
+  conditions      Json? // null = unconditional
+  description     String?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  role         Role?        @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@index([organization_id, subject, action])
+  @@map("policy")
+}
+
+// ─── Platform Core: Branches (hard-delete) ───────────────────────────────────
 
 model Branch {
   id                 String  @id @default(cuid())
-  organization_id    String?
-  name               String?
+  organization_id    String
+  name               String
   code               String?
   address            String?
   type               String?
   vertical           String?
   settings           Json?   @default("{}")
-  is_active          Boolean @default(true)
+  is_active          Boolean @default(true) // archive lifecycle (replaces the old `status` column)
   is_main            Boolean @default(false)
   phone              String?
   email              String?
-  status             String  @default("ACTIVE")
   timezone           String  @default("Asia/Vientiane")
   currency_code      String  @default("LAK") @db.VarChar(3)
   locale             String  @default("lo-LA") @db.VarChar(10)
@@ -205,23 +264,26 @@ model Branch {
   service_fee_bps    Int     @default(0)
   prices_include_tax Boolean @default(true)
 
-  created_at   DateTime      @default(now())
-  updated_at   DateTime      @updatedAt
-  deleted_at   DateTime?
-  organization Organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  organization    Organization         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  member_access   MemberBranchAccess[]
+  default_of      OrganizationMember[] @relation("MemberDefaultBranch")
 
   @@unique([organization_id, code])
   @@index([organization_id])
   @@index([organization_id, vertical])
   @@index([organization_id, is_main])
+  @@index([organization_id, is_active])
   @@map("branch")
 }
 
-// ─── Platform Core: Entitlements ─────────────────────────────────────────────
+// ─── Platform Core: Entitlements (hard-delete) ───────────────────────────────
 
 model EntitlementOverride {
   id              String    @id @default(cuid())
-  organization_id String?
+  organization_id String
   kind            String? // feature | module | limit
   code            String? // feature_code | module_code | limit_key
   enabled         Boolean?
@@ -231,16 +293,15 @@ model EntitlementOverride {
   expires_at      DateTime?
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
-  deleted_at      DateTime?
 
-  organization Organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
   @@unique([organization_id, kind, code])
   @@index([expires_at])
   @@map("entitlement_override")
 }
 
-// ─── Platform Core: Files ────────────────────────────────────────────────────
+// ─── Platform Core: Files (soft-delete) ──────────────────────────────────────
 
 model File {
   id              String    @id @default(cuid())

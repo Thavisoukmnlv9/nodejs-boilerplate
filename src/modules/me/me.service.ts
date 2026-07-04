@@ -1,9 +1,10 @@
 import type { Organization, User } from '@/generated/prisma/client';
 import { UserStatus } from '@/config/constants';
-import { BadRequestError, UnauthorizedError } from '@/common/errors';
+import { UnauthorizedError } from '@/common/errors';
 import { organizationRepository } from '@/modules/organizations/organization.repository';
 import { organizationService } from '@/modules/organizations/organization.service';
 import { roleService } from '@/modules/roles/role.service';
+import { policyRepository } from '@/modules/policies/policy.repository';
 import type { MeEntitlements, MeOrganization, MeResponse, MeUser } from '@/modules/me/me.types';
 
 /** Subscription models were removed → entitlements are always empty (kept for SPA compat). */
@@ -12,7 +13,7 @@ const EMPTY_ENTITLEMENTS: MeEntitlements = { modules: [], limits: {} };
 function toMeUser(user: User): MeUser {
   return {
     id: user.id,
-    email: user.email ?? '',
+    email: user.email,
     name: user.name,
     phone: user.phone,
     avatar_url: user.avatar_url,
@@ -37,9 +38,9 @@ function toMeOrg(org: Organization): MeOrganization {
 }
 
 /**
- * Assembles the bootstrap payload. Two shapes: a tenant user (org + permissions +
- * branches + entitlements) and a platform-staff user with no active org (org null,
- * empty permissions/entitlements) — matching the reference `/me`.
+ * Assembles the SPA bootstrap payload. Two shapes: an in-org user (org + permissions +
+ * branches + policies) and an org-less user (freshly registered OR platform staff) with
+ * org null and empty lists — the SPA routes an org-less user to onboarding.
  */
 export class MeService {
   async getMe(userId: string, orgId: string | null): Promise<MeResponse> {
@@ -51,35 +52,37 @@ export class MeService {
     const meUser = toMeUser(user);
 
     if (!orgId) {
-      if (user.is_platform_staff) {
-        return {
-          user: meUser,
-          organization: null,
-          permissions: [],
-          branches: [],
-          default_branch_id: null,
-          entitlements: EMPTY_ENTITLEMENTS,
-        };
-      }
-      throw new BadRequestError('No organization in token');
+      return {
+        user: meUser,
+        organization: null,
+        permissions: [],
+        branches: [],
+        default_branch_id: null,
+        policies: [],
+        entitlements: EMPTY_ENTITLEMENTS,
+      };
     }
 
     const ctx = await organizationService.loadContext(userId, orgId);
-    const [permissions, branches] = await Promise.all([
+    const [permissions, branches, policies] = await Promise.all([
       roleService.getPermissionCodes(ctx.membership.role_id),
       organizationService.getBranchesForMember(ctx.membership),
+      policyRepository.loadForMember(ctx.organization.id, ctx.membership.role_id ?? null),
     ]);
 
     return {
       user: meUser,
       organization: toMeOrg(ctx.organization),
       permissions,
-      branches: branches.map((b) => ({
-        id: b.id,
-        name: b.name ?? '',
-        is_default: b.id === ctx.membership.default_branch_id,
-      })),
+      branches: branches.map((b) => ({ id: b.id, name: b.name ?? '', is_default: b.id === ctx.membership.default_branch_id })),
       default_branch_id: ctx.membership.default_branch_id ?? null,
+      policies: policies.map((p) => ({
+        effect: p.effect,
+        action: p.action,
+        subject: p.subject,
+        conditions: p.conditions ?? null,
+        role_id: p.role_id ?? null,
+      })),
       entitlements: EMPTY_ENTITLEMENTS,
     };
   }

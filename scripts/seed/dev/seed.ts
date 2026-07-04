@@ -67,9 +67,14 @@ async function seedMembers(demoOrg: { orgId: string; branchId: string }, idByEma
   for (const u of DEMO_USERS) {
     const userId = idByEmail.get(u.email);
     if (!userId) continue;
-    await prisma.organizationMember.upsert({
+    const member = await prisma.organizationMember.upsert({
       where: { user_id_organization_id: { user_id: userId, organization_id: demoOrg.orgId } },
-      update: { role_id: u.roleId, is_owner: u.roleId === 'role_owner', accepted_at: new Date() },
+      update: {
+        role_id: u.roleId,
+        is_owner: u.roleId === 'role_owner',
+        accepted_at: new Date(),
+        default_branch_id: demoOrg.branchId,
+      },
       create: {
         id: `member_${u.id}`,
         user_id: userId,
@@ -77,12 +82,36 @@ async function seedMembers(demoOrg: { orgId: string; branchId: string }, idByEma
         role_id: u.roleId,
         is_owner: u.roleId === 'role_owner',
         accepted_at: new Date(),
-        branch_ids: [demoOrg.branchId],
         default_branch_id: demoOrg.branchId,
       },
     });
+    // Branch access via the join table (replaces the old `branch_ids` scalar array).
+    await prisma.memberBranchAccess.upsert({
+      where: { member_id_branch_id: { member_id: member.id, branch_id: demoOrg.branchId } },
+      update: {},
+      create: { member_id: member.id, branch_id: demoOrg.branchId },
+    });
   }
-  console.log(`  ✓ ${DEMO_USERS.length} organization members`);
+  console.log(`  ✓ ${DEMO_USERS.length} organization members (+ branch access)`);
+}
+
+/** Demo ABAC policies for the primary org — illustrate DENY-wins + attribute conditions. */
+async function seedPolicies(demoOrgId: string): Promise<void> {
+  await prisma.policy.upsert({
+    where: { id: 'policy_demo_protect_main_branch' },
+    update: {},
+    create: {
+      id: 'policy_demo_protect_main_branch',
+      organization_id: demoOrgId,
+      role_id: null,
+      effect: 'DENY',
+      action: 'delete',
+      subject: 'Branch',
+      conditions: { 'resource.is_main': true },
+      description: 'Nobody may delete the main branch (policy guard atop the service check).',
+    },
+  });
+  console.log('  ✓ 1 demo policy');
 }
 
 /** One active session per demo user, scoped to the demo org. */
@@ -178,6 +207,7 @@ async function main(): Promise<void> {
   if (!ownerId) throw new Error('demo owner user was not seeded');
 
   await seedMembers(demoOrg, idByEmail);
+  await seedPolicies(demoOrg.orgId);
   await seedSessions(demoOrg.orgId, idByEmail);
   await seedEntitlementOverrides(orgIds);
   await seedFiles(orgIds, ownerId);

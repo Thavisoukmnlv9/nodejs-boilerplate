@@ -1,17 +1,6 @@
-export interface PermissionSeed {
-  code: string;
-  module: string;
-  description: string;
-}
+import { definePermissionCatalog, type PermissionSeed, type RoleSeed } from '@/access/catalog';
 
-export interface RoleSeed {
-  /** Stable id so re-seeding is idempotent and matches the shared DB. */
-  id: string;
-  name: string;
-  description: string;
-  /** `'ALL'` grants every permission in the catalog; otherwise an explicit list. */
-  grants: 'ALL' | string[];
-}
+export type { PermissionSeed, RoleSeed };
 
 /** Vertical/module codes — a reference catalog for permission code prefixes. */
 export const MODULE_CODES = [
@@ -29,6 +18,7 @@ export type ModuleCode = (typeof MODULE_CODES)[number];
 export const MODULE_ACTIONS = ['view', 'create', 'update', 'delete', 'manage', 'reports'] as const;
 export type ModuleAction = (typeof MODULE_ACTIONS)[number];
 
+/** Fully-qualified platform.* permission codes. */
 const PLATFORM_CODES = [
   'platform.users.read',
   'platform.users.invite',
@@ -41,6 +31,8 @@ const PLATFORM_CODES = [
   'platform.branches.delete',
   'platform.roles.read',
   'platform.roles.manage',
+  'platform.policies.read',
+  'platform.policies.manage',
   'platform.subscription.read',
   'platform.subscription.change_plan',
   'platform.subscription.pause',
@@ -72,40 +64,26 @@ const PLATFORM_CODES = [
   'platform.reports.export',
 ];
 
-/** Turn `pos_shop.inventory.adjust` into a readable "Pos shop — inventory adjust". */
-function humanize(code: string): string {
-  const [mod, ...rest] = code.split('.');
-  const module = (mod ?? '').replace(/_/g, ' ');
-  const action = rest.join(' ').replace(/[._]/g, ' ');
-  return `${module.charAt(0).toUpperCase()}${module.slice(1)} — ${action}`;
-}
+/** The full catalog: platform codes + one entry per module×action, built by the library. */
+const CATALOG = definePermissionCatalog({
+  platformCodes: PLATFORM_CODES,
+  modules: MODULE_CODES,
+  moduleActions: MODULE_ACTIONS,
+});
 
-function toSeeds(codes: string[]): PermissionSeed[] {
-  return codes.map((code) => ({ code, module: code.split('.')[0] ?? 'platform', description: humanize(code) }));
-}
+export const ALL_PERMISSIONS: PermissionSeed[] = CATALOG.permissions;
+export const ALL_PERMISSION_CODES: string[] = CATALOG.codes;
+/** Whether a code exists in the catalog (used by role write-validation). */
+export const isKnownPermissionCode = (code: string): boolean => CATALOG.has(code);
 
-/** `{module}.view`, `{module}.create`, ... for one entry per `MODULE_ACTIONS`. */
-function moduleCodes(module: ModuleCode): string[] {
-  return MODULE_ACTIONS.map((action) => `${module}.${action}`);
-}
-
-export const ALL_PERMISSIONS: PermissionSeed[] = [
-  ...toSeeds(PLATFORM_CODES),
-  ...MODULE_CODES.flatMap((module) => toSeeds(moduleCodes(module))),
-];
-
-export const ALL_PERMISSION_CODES: string[] = ALL_PERMISSIONS.map((p) => p.code);
-
-/** Reserved for the Owner only — Admin/Manager are denied these. */
-export const DANGER_ZONE_CODES = [
-  'platform.organization.delete',
-  'platform.members.transfer_ownership',
-];
+/** Reserved for the Owner only — Admin/Manager are denied these, and no custom role may grant them. */
+export const DANGER_ZONE_CODES = ['platform.organization.delete', 'platform.members.transfer_ownership'];
 
 const MEMBER_GRANTS = [
   'platform.users.read',
   'platform.branches.read',
   'platform.roles.read',
+  'platform.policies.read',
   'platform.subscription.read',
   'platform.notifications.preferences',
 ];
@@ -114,9 +92,8 @@ const CASHIER_GRANTS = ['pos_shop.view', 'pos_shop.create', 'pos_shop.update'];
 
 /**
  * System roles (global: organization_id = null, is_system = true). Owner gets
- * everything; Admin/Manager get everything except the danger zone (Manager's extra
- * power would be PIN-gated at the POS-operation level, not by a broader grant).
- * Room is left for org-scoped custom roles.
+ * everything; Admin/Manager get everything except the danger zone. Room is left
+ * for org-scoped custom roles created through the API.
  */
 export const SYSTEM_ROLES: RoleSeed[] = [
   {

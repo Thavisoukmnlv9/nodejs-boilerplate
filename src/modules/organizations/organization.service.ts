@@ -1,8 +1,26 @@
 import type { Branch, OrganizationMember } from '@/generated/prisma/client';
+import { env } from '@/config/env';
 import { UserStatus } from '@/config/constants';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '@/common/errors';
+import { signAccessToken } from '@/common/utils/token';
 import type { AuthContext } from '@/common/types/context';
 import { type OrganizationRepository, organizationRepository } from '@/modules/organizations/organization.repository';
+import type { CreateOrganizationInput } from '@/modules/organizations/organization.schema';
+
+interface CreatedOrgResponse {
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    currency_code: string;
+    locale: string;
+    timezone: string;
+  };
+  access_token: string;
+  token_type: 'bearer';
+  expires_in: number;
+}
 
 /**
  * Resolves the full request principal — the Express equivalent of the reference's
@@ -32,11 +50,37 @@ export class OrganizationService {
   }
 
   /** Branches a member may operate: owners see all active branches; others see their assigned set. */
-  async getBranchesForMember(membership: OrganizationMember): Promise<Branch[]> {
+  async getBranchesForMember(
+    membership: OrganizationMember & { branch_access?: { branch_id: string }[] },
+  ): Promise<Branch[]> {
     if (!membership.organization_id) return [];
     if (membership.is_owner) return this.repo.findActiveBranches(membership.organization_id);
-    if (!membership.branch_ids?.length) return [];
-    return this.repo.findBranchesByIds(membership.organization_id, membership.branch_ids);
+    const ids = (membership.branch_access ?? []).map((a) => a.branch_id);
+    if (ids.length === 0) return [];
+    return this.repo.findBranchesByIds(membership.organization_id, ids);
+  }
+
+  /**
+   * Onboarding: create an org, make the caller Owner, and mint a fresh access token
+   * carrying the new org_id so the SPA is immediately in-org (paired with the
+   * repository repointing the caller's existing org-less sessions).
+   */
+  async createOrganization(userId: string, input: CreateOrganizationInput): Promise<CreatedOrgResponse> {
+    const org = await this.repo.createOrganizationWithOwner(userId, input);
+    return {
+      organization: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo_url: org.logo_url,
+        currency_code: org.currency_code,
+        locale: org.locale,
+        timezone: org.timezone,
+      },
+      access_token: signAccessToken(userId, org.id),
+      token_type: 'bearer',
+      expires_in: env.accessTtlSec,
+    };
   }
 }
 

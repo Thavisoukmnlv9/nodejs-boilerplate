@@ -62,6 +62,17 @@ export const authController = {
     res.json({ ok: true });
   },
 
+  async acceptInvite(req: Request, res: Response): Promise<void> {
+    const r = await authService.acceptInvite(req.body, meta(req));
+    setRefreshCookie(res, r.refreshToken);
+    res.status(201).json({
+      access_token: r.accessToken,
+      refresh_token: r.refreshToken,
+      token_type: 'bearer',
+      expires_in: r.expiresIn,
+    });
+  },
+
   async listSessions(req: Request, res: Response): Promise<void> {
     res.json(await authService.listSessions(req.auth!.userId));
   },

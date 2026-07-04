@@ -45,9 +45,9 @@
     ]
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.0",
     "@aws-sdk/client-s3": "^3.726.0",
     "@aws-sdk/s3-request-presigner": "^3.726.0",
-    "@asteasolutions/zod-to-openapi": "^7.3.0",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "bcryptjs": "^2.4.3",

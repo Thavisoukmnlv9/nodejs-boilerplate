@@ -1,28 +1,36 @@
-import type { Prisma } from '@/generated/prisma/client';
+import type { Prisma, UserStatus } from '@/generated/prisma/client';
 import { BaseRepository } from '@/infra/prisma';
 
-const withUser = { user: true } satisfies Prisma.OrganizationMemberInclude;
+const withDetails = {
+  user: true,
+  branch_access: { select: { branch_id: true } },
+} satisfies Prisma.OrganizationMemberInclude;
 
 export class UsersRepository extends BaseRepository {
-  listMembers(organizationId: string, opts: { limit: number; offset: number; q?: string }) {
+  listMembers(
+    organizationId: string,
+    opts: { limit: number; offset: number; q?: string; status?: string; role_id?: string },
+  ) {
+    const userWhere: Prisma.UserWhereInput = {};
+    if (opts.status && opts.status !== 'PENDING') userWhere.status = opts.status as UserStatus;
+    if (opts.q) {
+      userWhere.OR = [
+        { name: { contains: opts.q, mode: 'insensitive' } },
+        { email: { contains: opts.q, mode: 'insensitive' } },
+      ];
+    }
     const where: Prisma.OrganizationMemberWhereInput = {
       organization_id: organizationId,
       ...this.notDeleted,
-      ...(opts.q
-        ? {
-            user: {
-              OR: [
-                { name: { contains: opts.q, mode: 'insensitive' } },
-                { email: { contains: opts.q, mode: 'insensitive' } },
-              ],
-            },
-          }
-        : {}),
+      ...(opts.role_id ? { role_id: opts.role_id } : {}),
+      ...(opts.status === 'PENDING' ? { accepted_at: null } : {}),
+      ...(opts.status && opts.status !== 'PENDING' ? { accepted_at: { not: null } } : {}),
+      ...(Object.keys(userWhere).length ? { user: userWhere } : {}),
     };
     return Promise.all([
       this.db.organizationMember.findMany({
         where,
-        include: withUser,
+        include: withDetails,
         orderBy: [{ is_owner: 'desc' }, { invited_at: 'desc' }],
         take: opts.limit,
         skip: opts.offset,
@@ -34,13 +42,20 @@ export class UsersRepository extends BaseRepository {
   findMember(organizationId: string, memberId: string) {
     return this.db.organizationMember.findFirst({
       where: { id: memberId, organization_id: organizationId, ...this.notDeleted },
-      include: withUser,
+      include: withDetails,
     });
   }
 
   findMembershipByUser(organizationId: string, userId: string) {
     return this.db.organizationMember.findFirst({
       where: { organization_id: organizationId, user_id: userId, ...this.notDeleted },
+    });
+  }
+
+  findByInviteTokenHash(hash: string) {
+    return this.db.organizationMember.findFirst({
+      where: { invitation_token_hash: hash, accepted_at: null, ...this.notDeleted },
+      include: { user: true },
     });
   }
 
@@ -52,12 +67,94 @@ export class UsersRepository extends BaseRepository {
     return this.db.user.create({ data: { email, name: name ?? null, status: 'ACTIVE' } });
   }
 
-  createMembership(data: Prisma.OrganizationMemberUncheckedCreateInput) {
-    return this.db.organizationMember.create({ data, include: withUser });
+  // Tenant-isolation checks — a member's role/branches must belong to the caller's org.
+  findRoleForOrg(organizationId: string, roleId: string) {
+    return this.db.role.findFirst({
+      where: { id: roleId, OR: [{ organization_id: organizationId }, { organization_id: null, is_system: true }] },
+    });
   }
 
-  updateMembership(id: string, data: Prisma.OrganizationMemberUncheckedUpdateInput) {
-    return this.db.organizationMember.update({ where: { id }, data, include: withUser });
+  findOrgBranchIds(organizationId: string, ids: string[]) {
+    return this.db.branch.findMany({ where: { organization_id: organizationId, id: { in: ids } }, select: { id: true } });
+  }
+
+  createMembership(data: {
+    organization_id: string;
+    user_id: string;
+    role_id: string;
+    branch_ids: string[];
+    default_branch_id: string | null;
+    staff_title: string | null;
+    staff_note: string | null;
+    invited_by_id: string;
+    invitation_token_hash: string;
+    invitation_expires_at: Date;
+  }) {
+    return this.db.$transaction(async (tx) => {
+      const member = await tx.organizationMember.create({
+        data: {
+          organization_id: data.organization_id,
+          user_id: data.user_id,
+          role_id: data.role_id,
+          default_branch_id: data.default_branch_id,
+          staff_title: data.staff_title,
+          staff_note: data.staff_note,
+          invited_by_id: data.invited_by_id,
+          invitation_token_hash: data.invitation_token_hash,
+          invitation_expires_at: data.invitation_expires_at,
+        },
+      });
+      if (data.branch_ids.length) {
+        await tx.memberBranchAccess.createMany({
+          data: data.branch_ids.map((branch_id) => ({ member_id: member.id, branch_id })),
+          skipDuplicates: true,
+        });
+      }
+      return tx.organizationMember.findUniqueOrThrow({ where: { id: member.id }, include: withDetails });
+    });
+  }
+
+  updateMembership(
+    memberId: string,
+    data: { scalars: Prisma.OrganizationMemberUncheckedUpdateInput; branch_ids?: string[] },
+  ) {
+    return this.db.$transaction(async (tx) => {
+      if (Object.keys(data.scalars).length) {
+        await tx.organizationMember.update({ where: { id: memberId }, data: data.scalars });
+      }
+      if (data.branch_ids) {
+        await tx.memberBranchAccess.deleteMany({ where: { member_id: memberId } });
+        if (data.branch_ids.length) {
+          await tx.memberBranchAccess.createMany({
+            data: data.branch_ids.map((branch_id) => ({ member_id: memberId, branch_id })),
+            skipDuplicates: true,
+          });
+        }
+      }
+      return tx.organizationMember.findUniqueOrThrow({ where: { id: memberId }, include: withDetails });
+    });
+  }
+
+  regenerateInvite(memberId: string, hash: string, expiresAt: Date) {
+    return this.db.organizationMember.update({
+      where: { id: memberId },
+      data: { invitation_token_hash: hash, invitation_expires_at: expiresAt },
+      include: withDetails,
+    });
+  }
+
+  /** Accept an invite: set the user's password + mark the membership accepted (atomic). */
+  acceptInvite(memberId: string, userId: string, passwordHash: string, name?: string) {
+    return this.db.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { password_hash: passwordHash, email_verified_at: new Date(), status: 'ACTIVE', ...(name ? { name } : {}) },
+      });
+      return tx.organizationMember.update({
+        where: { id: memberId },
+        data: { accepted_at: new Date(), invitation_token_hash: null, invitation_expires_at: null },
+      });
+    });
   }
 
   updateUserName(userId: string, name: string) {
