@@ -8,35 +8,60 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
   next(new NotFoundError(`Route not found: ${req.method} ${req.path}`));
 };
 
-/** Normalize framework/library errors into our AppError hierarchy where we can. */
-function normalize(err: unknown): AppError | null {
-  if (err instanceof AppError) return err;
+/** The loosely-typed shape of the framework/library errors sniffed below. */
+interface LibraryError {
+  type?: string;
+  status?: number;
+  name?: string;
+  message?: string;
+  code?: string;
+}
 
-  if (err instanceof ZodError) {
-    return new ValidationError(
-      'One or more fields are invalid.',
-      err.issues.map((i) => ({ loc: i.path.map(String), msg: i.message, type: i.code })),
-    );
-  }
+/** Zod validation failure → 422 with a FastAPI-style per-field `detail` array. */
+function fromZodError(err: unknown): AppError | null {
+  if (!(err instanceof ZodError)) return null;
+  return new ValidationError(
+    'One or more fields are invalid.',
+    err.issues.map((i) => ({ loc: i.path.map(String), msg: i.message, type: i.code })),
+  );
+}
 
-  const anyErr = err as { type?: string; status?: number; name?: string; message?: string; code?: string };
-
-  // body-parser: malformed JSON / oversized body
-  if (anyErr?.type === 'entity.parse.failed') return new BadRequestError('Malformed JSON body');
-  if (anyErr?.type === 'entity.too.large') {
+/** body-parser: malformed JSON (400) or an oversized body (413). */
+function fromBodyParser(err: LibraryError): AppError | null {
+  if (err.type === 'entity.parse.failed') return new BadRequestError('Malformed JSON body');
+  if (err.type === 'entity.too.large') {
     return Object.assign(new BadRequestError('Request body too large'), { statusCode: 413, code: 'payload_too_large' });
   }
-  // multer upload errors
-  if (anyErr?.name === 'MulterError') {
-    const tooBig = anyErr.code === 'LIMIT_FILE_SIZE';
-    const e = new BadRequestError(tooBig ? 'File too large' : anyErr.message ?? 'Upload error');
-    return tooBig ? Object.assign(e, { statusCode: 413, code: 'payload_too_large' }) : e;
-  }
-  // CORS rejection surfaced from config/cors.ts
-  if (typeof anyErr?.message === 'string' && anyErr.message.startsWith('Origin not allowed by CORS')) {
-    return Object.assign(new BadRequestError(anyErr.message), { statusCode: 403, code: 'forbidden' });
+  return null;
+}
+
+/** multer upload errors: file-too-large (413) or a generic upload failure (400). */
+function fromMulter(err: LibraryError): AppError | null {
+  if (err.name !== 'MulterError') return null;
+  const tooBig = err.code === 'LIMIT_FILE_SIZE';
+  const e = new BadRequestError(tooBig ? 'File too large' : (err.message ?? 'Upload error'));
+  return tooBig ? Object.assign(e, { statusCode: 413, code: 'payload_too_large' }) : e;
+}
+
+/** CORS rejection surfaced from config/cors.ts → 403. */
+function fromCors(err: LibraryError): AppError | null {
+  if (typeof err.message === 'string' && err.message.startsWith('Origin not allowed by CORS')) {
+    return Object.assign(new BadRequestError(err.message), { statusCode: 403, code: 'forbidden' });
   }
   return null;
+}
+
+/**
+ * Normalize framework/library errors into our AppError hierarchy where we can.
+ * First matching source wins — the order (AppError → Zod → body-parser → multer →
+ * CORS) is deliberate; an unrecognized error returns null and is treated as a 500.
+ */
+function normalize(err: unknown): AppError | null {
+  if (err instanceof AppError) return err;
+  const zodError = fromZodError(err);
+  if (zodError) return zodError;
+  const libErr = err as LibraryError;
+  return fromBodyParser(libErr) ?? fromMulter(libErr) ?? fromCors(libErr);
 }
 
 /**
