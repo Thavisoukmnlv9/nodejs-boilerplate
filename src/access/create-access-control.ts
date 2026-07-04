@@ -96,13 +96,19 @@ export function createAccessControl(deps: AccessControlDeps): AccessControl {
     return p;
   }
 
+  /**
+   * The single shared load path for the request guards: a request's RBAC permissions
+   * and ABAC policies, both req-memoized. Kept in one place so the two guards that need
+   * both can't drift apart. (The cache-less public `can()` loads conditionally on its own.)
+   */
+  function loadPermsAndPolicies(req: Request, ctx: AuthContext): Promise<[string[], PolicyRule[]]> {
+    const roleId = ctx.membership.role_id ?? null;
+    return Promise.all([permsFor(req, roleId), policiesFor(req, ctx.organization.id, roleId)]);
+  }
+
   async function evaluateReq(req: Request, input: Omit<CanInput, 'ctx'>): Promise<Decision> {
     const ctx = await ensureAuthContext(req);
-    const roleId = ctx.membership.role_id ?? null;
-    const [perms, policies] = await Promise.all([
-      permsFor(req, roleId),
-      policiesFor(req, ctx.organization.id, roleId),
-    ]);
+    const [perms, policies] = await loadPermsAndPolicies(req, ctx);
     return decide({ ctx, ...input }, perms, policies);
   }
 
@@ -128,11 +134,7 @@ export function createAccessControl(deps: AccessControlDeps): AccessControl {
   function requireAnyPermission(...codes: string[]): RequestHandler {
     return asyncHandler(async (req, _res, next) => {
       const ctx = await ensureAuthContext(req);
-      const roleId = ctx.membership.role_id ?? null;
-      const [perms, policies] = await Promise.all([
-        permsFor(req, roleId),
-        policiesFor(req, ctx.organization.id, roleId),
-      ]);
+      const [perms, policies] = await loadPermsAndPolicies(req, ctx);
       const ok = codes.some((code) => decide({ ctx, permission: code }, perms, policies).allowed);
       if (!ok) throw new ForbiddenError(`Permission denied: requires one of ${codes.join(', ')}`);
       next();
