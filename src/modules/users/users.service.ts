@@ -75,6 +75,22 @@ export class UsersService {
     }
   }
 
+  /** An owner's role is immutable, and a member cannot change their own role. */
+  private assertRoleChangeAllowed(existing: MemberWithDetails, actingUserId: string): void {
+    if (existing.is_owner) throw new ForbiddenError("Cannot change the owner's role");
+    if (existing.user_id === actingUserId) throw new ForbiddenError('You cannot change your own role');
+  }
+
+  /** Collect only the explicitly-provided scalar fields into a Prisma update patch. */
+  private buildScalarPatch(input: UpdateUserInput): Prisma.OrganizationMemberUncheckedUpdateInput {
+    const scalars: Prisma.OrganizationMemberUncheckedUpdateInput = {};
+    if (input.role_id !== undefined) scalars.role_id = input.role_id;
+    if (input.default_branch_id !== undefined) scalars.default_branch_id = input.default_branch_id;
+    if (input.staff_title !== undefined) scalars.staff_title = input.staff_title;
+    if (input.staff_note !== undefined) scalars.staff_note = input.staff_note;
+    return scalars;
+  }
+
   async invite(organizationId: string, invitedById: string, input: InviteUserInput): Promise<InviteIssued> {
     await this.validateAssignment(organizationId, input.role_id, input.branch_ids);
     if (input.default_branch_id && !input.branch_ids.includes(input.default_branch_id)) {
@@ -108,10 +124,7 @@ export class UsersService {
     const existing = await this.repo.findMember(organizationId, memberId);
     if (!existing) throw new NotFoundError('User not found');
 
-    if (input.role_id !== undefined) {
-      if (existing.is_owner) throw new ForbiddenError("Cannot change the owner's role");
-      if (existing.user_id === actingUserId) throw new ForbiddenError('You cannot change your own role');
-    }
+    if (input.role_id !== undefined) this.assertRoleChangeAllowed(existing, actingUserId);
     await this.validateAssignment(organizationId, input.role_id, input.branch_ids);
 
     const effectiveBranchIds = input.branch_ids ?? existing.branch_access.map((a) => a.branch_id);
@@ -121,12 +134,7 @@ export class UsersService {
 
     if (input.name && existing.user_id) await this.repo.updateUserName(existing.user_id, input.name);
 
-    const scalars: Prisma.OrganizationMemberUncheckedUpdateInput = {};
-    if (input.role_id !== undefined) scalars.role_id = input.role_id;
-    if (input.default_branch_id !== undefined) scalars.default_branch_id = input.default_branch_id;
-    if (input.staff_title !== undefined) scalars.staff_title = input.staff_title;
-    if (input.staff_note !== undefined) scalars.staff_note = input.staff_note;
-
+    const scalars = this.buildScalarPatch(input);
     const member = await this.repo.updateMembership(memberId, { scalars, branch_ids: input.branch_ids });
     return toView(member);
   }

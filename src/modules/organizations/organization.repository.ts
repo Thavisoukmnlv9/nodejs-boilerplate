@@ -1,4 +1,4 @@
-import type { Branch, Organization } from '@/generated/prisma/client';
+import type { Branch, Organization, Prisma } from '@/generated/prisma/client';
 import { BaseRepository } from '@/infra/prisma';
 
 interface CreateOrgInput {
@@ -19,6 +19,15 @@ function slugify(value: string): string {
       .replace(/^-+|-+$/g, '')
       .slice(0, 40) || 'org'
   );
+}
+
+/** First unused slug in the sequence `base`, `base-2`, `base-3`, … (within the tx). */
+async function nextAvailableSlug(tx: Prisma.TransactionClient, base: string): Promise<string> {
+  let slug = base;
+  for (let n = 2; await tx.organization.findUnique({ where: { slug } }); n += 1) {
+    slug = `${base}-${n}`;
+  }
+  return slug;
 }
 
 /** Data access for identity/tenancy resolution. Owns no HTTP concerns. */
@@ -61,9 +70,7 @@ export class OrganizationRepository extends BaseRepository {
    */
   createOrganizationWithOwner(userId: string, input: CreateOrgInput): Promise<Organization> {
     return this.db.$transaction(async (tx) => {
-      const base = slugify(input.slug ?? input.name);
-      let slug = base;
-      for (let n = 2; await tx.organization.findUnique({ where: { slug } }); n += 1) slug = `${base}-${n}`;
+      const slug = await nextAvailableSlug(tx, slugify(input.slug ?? input.name));
 
       const org = await tx.organization.create({
         data: {
