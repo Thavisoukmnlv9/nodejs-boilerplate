@@ -10,6 +10,6 @@ export const filesController = {
   },
 
   async get(req: Request, res: Response): Promise<void> {
-    res.json(await filesService.getMeta(req.authContext!.organization.id, req.params.id!));
+    res.json(await filesService.getMeta(req.authContext!.organization.id, req.params.id as string));
   },
 };

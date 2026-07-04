@@ -13,7 +13,7 @@ export const listUsersQuery = paginationQuery.extend({
 export const userIdParam = z.object({ id: z.string().min(1) });
 
 export const inviteUserSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   name: z.string().max(120).optional(),
   role_id: z.string().min(1),
   branch_ids: z.array(z.string().min(1)).max(100).optional().default([]),

@@ -13,7 +13,7 @@ export const rolesController = {
   },
 
   async get(req: Request, res: Response): Promise<void> {
-    res.json(await roleService.getRole(req.authContext!.organization.id, req.params.id!));
+    res.json(await roleService.getRole(req.authContext!.organization.id, req.params.id as string));
   },
 
   async create(req: Request, res: Response): Promise<void> {
@@ -21,11 +21,11 @@ export const rolesController = {
   },
 
   async update(req: Request, res: Response): Promise<void> {
-    res.json(await roleService.updateRole(req.authContext!.organization.id, req.params.id!, req.body));
+    res.json(await roleService.updateRole(req.authContext!.organization.id, req.params.id as string, req.body));
   },
 
   async remove(req: Request, res: Response): Promise<void> {
-    await roleService.deleteRole(req.authContext!.organization.id, req.params.id!);
+    await roleService.deleteRole(req.authContext!.organization.id, req.params.id as string);
     res.status(204).send();
   },
 };

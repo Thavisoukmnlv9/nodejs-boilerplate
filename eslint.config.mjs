@@ -47,6 +47,10 @@ export default tseslint.config(
       sourceType: 'commonjs',
       globals: { module: 'writable', require: 'readonly', process: 'readonly', __dirname: 'readonly' },
     },
+    // CommonJS config files legitimately use require().
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
   },
   {
     // Seed/scripts legitimately log to the console.

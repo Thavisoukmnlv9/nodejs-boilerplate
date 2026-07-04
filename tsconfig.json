@@ -10,6 +10,10 @@
     "paths": {
       "@/*": ["src/*"]
     },
+    // tsc-alias rewrites the "@/*" path aliases at build time using baseUrl, which
+    // TypeScript 6 deprecates (removed in 7). Silence the 6.0 deprecation so the
+    // existing build pipeline keeps working.
+    "ignoreDeprecations": "6.0",
 
     "strict": true,
     "noUncheckedIndexedAccess": true,

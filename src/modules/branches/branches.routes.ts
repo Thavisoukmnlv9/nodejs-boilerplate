@@ -14,7 +14,7 @@ export const branchesRoutes = Router();
 
 /** Loads the target branch so requirePolicy can evaluate conditions against it. */
 const loadBranch = (req: Request, ctx: AuthContext): Promise<Record<string, unknown> | null> =>
-  branchRepository.findInOrg(ctx.organization.id, req.params.id!) as Promise<Record<string, unknown> | null>;
+  branchRepository.findInOrg(ctx.organization.id, req.params.id as string) as Promise<Record<string, unknown> | null>;
 
 branchesRoutes.get(
   '/',

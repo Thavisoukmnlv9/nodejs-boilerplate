@@ -31,6 +31,9 @@ export function createApp(): Express {
   app.disable('x-powered-by');
   // One proxy hop (nginx) → trust it so req.ip / rate limiting see the real client.
   app.set('trust proxy', 1);
+  // Express 5 defaults the query parser to 'simple' (flat keys); set it explicitly.
+  // Repeated keys are collapsed by the param-pollution guard (see security.ts).
+  app.set('query parser', 'simple');
 
   // Correlation, metrics, structured request logs.
   app.use(requestId);

@@ -12,7 +12,7 @@ const password = z
   .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), 'Password must include at least one letter and one digit');
 
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password,
   display_name: z.string().max(80).optional(),
   locale: z.string().max(10).optional(),
@@ -20,7 +20,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
 });
 
@@ -34,7 +34,7 @@ export const logoutSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
 });
 
 export const resetPasswordSchema = z.object({

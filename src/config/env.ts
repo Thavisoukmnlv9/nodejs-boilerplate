@@ -1,5 +1,8 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
 import { z } from 'zod';
+
+// dotenv 17 prints an env-injection banner by default; keep boot/test output clean.
+config({ quiet: true });
 
 /**
  * 12-factor config. The ENTIRE surface of `process.env` this app cares about is
@@ -28,7 +31,7 @@ const zStringList = (def: string[]) =>
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) return parsed.map(String);
         } catch {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'must be a JSON array or comma-separated list' });
+          ctx.addIssue({ code: 'custom', message: 'must be a JSON array or comma-separated list' });
           return z.NEVER;
         }
       }
@@ -95,7 +98,7 @@ const schema = z
       for (const key of ['S3_BUCKET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'] as const) {
         if (!val[key]) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: [key],
             message: `${key} is required when STORAGE_DRIVER=s3`,
           });

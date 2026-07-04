@@ -78,7 +78,7 @@ export const authController = {
   },
 
   async revokeSession(req: Request, res: Response): Promise<void> {
-    await authService.revokeSession(req.auth!.userId, req.params.id!);
+    await authService.revokeSession(req.auth!.userId, req.params.id as string);
     res.json({ ok: true });
   },
 };

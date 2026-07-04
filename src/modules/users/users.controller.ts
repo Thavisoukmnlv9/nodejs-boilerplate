@@ -10,7 +10,7 @@ export const usersController = {
   },
 
   async get(req: Request, res: Response): Promise<void> {
-    res.json(await usersService.get(req.authContext!.organization.id, req.params.id!));
+    res.json(await usersService.get(req.authContext!.organization.id, req.params.id as string));
   },
 
   async create(req: Request, res: Response): Promise<void> {
@@ -20,15 +20,15 @@ export const usersController = {
 
   async update(req: Request, res: Response): Promise<void> {
     const orgId = req.authContext!.organization.id;
-    res.json(await usersService.update(orgId, req.params.id!, req.auth!.userId, req.body));
+    res.json(await usersService.update(orgId, req.params.id as string, req.auth!.userId, req.body));
   },
 
   async remove(req: Request, res: Response): Promise<void> {
-    await usersService.remove(req.authContext!.organization.id, req.params.id!, req.auth!.userId);
+    await usersService.remove(req.authContext!.organization.id, req.params.id as string, req.auth!.userId);
     res.status(204).send();
   },
 
   async resendInvite(req: Request, res: Response): Promise<void> {
-    res.status(201).json(await usersService.resendInvite(req.authContext!.organization.id, req.params.id!));
+    res.status(201).json(await usersService.resendInvite(req.authContext!.organization.id, req.params.id as string));
   },
 };

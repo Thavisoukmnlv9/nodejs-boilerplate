@@ -9,7 +9,7 @@ export const policiesController = {
   },
 
   async get(req: Request, res: Response): Promise<void> {
-    res.json(await policyService.get(req.authContext!.organization.id, req.params.id!));
+    res.json(await policyService.get(req.authContext!.organization.id, req.params.id as string));
   },
 
   async create(req: Request, res: Response): Promise<void> {
@@ -17,11 +17,11 @@ export const policiesController = {
   },
 
   async update(req: Request, res: Response): Promise<void> {
-    res.json(await policyService.update(req.authContext!.organization.id, req.params.id!, req.body));
+    res.json(await policyService.update(req.authContext!.organization.id, req.params.id as string, req.body));
   },
 
   async remove(req: Request, res: Response): Promise<void> {
-    await policyService.remove(req.authContext!.organization.id, req.params.id!);
+    await policyService.remove(req.authContext!.organization.id, req.params.id as string);
     res.status(204).send();
   },
 };

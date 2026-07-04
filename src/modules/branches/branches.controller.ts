@@ -18,8 +18,8 @@ export const branchesController = {
 
   async get(req: Request, res: Response): Promise<void> {
     const scope = await getBranchScope(req);
-    resolveBranchWhere(req.params.id!, scope); // 403 if the branch is outside the caller's scope
-    res.json(await branchService.get(req.authContext!.organization.id, req.params.id!));
+    resolveBranchWhere(req.params.id as string, scope); // 403 if the branch is outside the caller's scope
+    res.json(await branchService.get(req.authContext!.organization.id, req.params.id as string));
   },
 
   async create(req: Request, res: Response): Promise<void> {
@@ -27,11 +27,11 @@ export const branchesController = {
   },
 
   async update(req: Request, res: Response): Promise<void> {
-    res.json(await branchService.update(req.authContext!.organization.id, req.params.id!, req.body));
+    res.json(await branchService.update(req.authContext!.organization.id, req.params.id as string, req.body));
   },
 
   async remove(req: Request, res: Response): Promise<void> {
-    await branchService.remove(req.authContext!.organization.id, req.params.id!);
+    await branchService.remove(req.authContext!.organization.id, req.params.id as string);
     res.status(204).send();
   },
 };

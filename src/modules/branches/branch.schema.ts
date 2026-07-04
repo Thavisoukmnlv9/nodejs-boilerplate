@@ -40,7 +40,7 @@ export const createBranchSchema = z.object({
   type: z.string().max(60).optional(),
   vertical: z.enum(BRANCH_VERTICALS).optional(),
   phone: z.string().max(40).optional(),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   timezone: timezone.optional(),
   currency_code: z.enum(BRANCH_CURRENCIES).optional(),
   locale: z.string().max(10).optional(),
@@ -59,7 +59,7 @@ export const updateBranchSchema = z
     is_active: z.boolean().optional(),
     is_main: z.boolean().optional(), // true = promote (swap); false = rejected by the service
     phone: z.string().max(40).nullable().optional(),
-    email: z.string().email().nullable().optional(),
+    email: z.email().nullable().optional(),
     timezone: timezone.optional(),
     currency_code: z.enum(BRANCH_CURRENCIES).optional(),
     locale: z.string().max(10).optional(),

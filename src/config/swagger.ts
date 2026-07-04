@@ -30,7 +30,7 @@ function buildDocument() {
     expires_in: z.number(),
   });
 
-  const json = (schema: z.ZodTypeAny) => ({ content: { 'application/json': { schema } } });
+  const json = (schema: z.ZodType) => ({ content: { 'application/json': { schema } } });
 
   registry.registerPath({
     method: 'post',

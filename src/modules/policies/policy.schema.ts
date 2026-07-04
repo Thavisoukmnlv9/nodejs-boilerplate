@@ -6,7 +6,7 @@ export const POLICY_SUBJECTS = ['Branch', 'Role', 'User', 'Policy', 'Organizatio
 export const POLICY_EFFECTS = ['ALLOW', 'DENY'] as const;
 
 /** A JSON object matcher, e.g. { "resource.is_main": true }. Null = unconditional. */
-const conditions = z.record(z.unknown()).nullable().optional();
+const conditions = z.record(z.string(), z.unknown()).nullable().optional();
 
 export const listPoliciesQuery = paginationQuery.extend({
   subject: z.enum(POLICY_SUBJECTS).optional(),

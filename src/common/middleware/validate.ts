@@ -1,11 +1,11 @@
 import type { RequestHandler } from 'express';
-import type { ZodTypeAny } from 'zod';
+import type { ZodType } from 'zod';
 import { ValidationError } from '@/common/errors';
 
 export interface ValidationSchemas {
-  body?: ZodTypeAny;
-  query?: ZodTypeAny;
-  params?: ZodTypeAny;
+  body?: ZodType;
+  query?: ZodType;
+  params?: ZodType;
 }
 
 interface DetailIssue {
@@ -28,10 +28,18 @@ export const validate =
     for (const part of ['body', 'query', 'params'] as const) {
       const schema = schemas[part];
       if (!schema) continue;
-      const result = schema.safeParse(req[part]);
+      // Express 5 body-parser yields `undefined` (not `{}`) when there is no body.
+      const input = part === 'body' ? (req.body ?? {}) : req[part];
+      const result = schema.safeParse(input);
       if (result.success) {
-        // Express 4's req.query/params are writable — assign back the coerced value.
-        (req as unknown as Record<string, unknown>)[part] = result.data;
+        // req.query/params are getter-only in Express 5; assign the coerced value as
+        // an own data property instead of writing through the (setter-less) accessor.
+        Object.defineProperty(req, part, {
+          value: result.data,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       } else {
         for (const issue of result.error.issues) {
           issues.push({ loc: [part, ...issue.path.map(String)], msg: issue.message, type: issue.code });
