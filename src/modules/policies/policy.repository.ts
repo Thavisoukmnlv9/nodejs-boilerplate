@@ -1,6 +1,29 @@
-import type { Prisma } from '@/generated/prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import type { PolicyRule } from '@/access/types';
 import { BaseRepository } from '@/infra/prisma';
+import { buildOrderBy, type SortOrder } from '@/common/utils/sortableQuery';
+
+type PolicyListFilters = { subject?: string; action?: string; role_id?: string };
+
+/** Public sort column → Prisma orderBy for the policies list. */
+const POLICY_ORDER_BY: Record<string, (dir: SortOrder) => Prisma.PolicyOrderByWithRelationInput> = {
+  effect: (dir) => ({ effect: dir }),
+  action: (dir) => ({ action: dir }),
+  subject: (dir) => ({ subject: dir }),
+  created_at: (dir) => ({ created_at: dir }),
+  updated_at: (dir) => ({ updated_at: dir }),
+};
+
+const POLICY_DEFAULT_ORDER: Prisma.PolicyOrderByWithRelationInput[] = [{ created_at: 'desc' }];
+
+function buildPolicyListWhere(organizationId: string, opts: PolicyListFilters): Prisma.PolicyWhereInput {
+  return {
+    organization_id: organizationId,
+    ...(opts.subject ? { subject: opts.subject } : {}),
+    ...(opts.action ? { action: opts.action } : {}),
+    ...(opts.role_id ? { role_id: opts.role_id } : {}),
+  };
+}
 
 /** Policy is HARD-deleted. */
 export class PolicyRepository extends BaseRepository {
@@ -21,17 +44,36 @@ export class PolicyRepository extends BaseRepository {
     }));
   }
 
-  list(organizationId: string, opts: { limit: number; offset: number; subject?: string; action?: string; role_id?: string }) {
-    const where: Prisma.PolicyWhereInput = {
-      organization_id: organizationId,
-      ...(opts.subject ? { subject: opts.subject } : {}),
-      ...(opts.action ? { action: opts.action } : {}),
-      ...(opts.role_id ? { role_id: opts.role_id } : {}),
-    };
+  list(organizationId: string, opts: PolicyListFilters & { limit: number; offset: number; sort?: string; order?: SortOrder }) {
+    const where = buildPolicyListWhere(organizationId, opts);
+    const orderBy = buildOrderBy(opts.sort, opts.order ?? 'desc', POLICY_ORDER_BY, POLICY_DEFAULT_ORDER);
     return Promise.all([
-      this.db.policy.findMany({ where, orderBy: [{ created_at: 'desc' }], take: opts.limit, skip: opts.offset }),
+      this.db.policy.findMany({ where, orderBy, take: opts.limit, skip: opts.offset }),
       this.db.policy.count({ where }),
     ]);
+  }
+
+  /** All policies matching the filters (no pagination) — export path, hard-capped. */
+  listForExport(organizationId: string, opts: PolicyListFilters & { sort?: string; order?: SortOrder; cap: number }) {
+    const where = buildPolicyListWhere(organizationId, opts);
+    const orderBy = buildOrderBy(opts.sort, opts.order ?? 'desc', POLICY_ORDER_BY, POLICY_DEFAULT_ORDER);
+    return this.db.policy.findMany({ where, orderBy, take: opts.cap });
+  }
+
+  findManyInOrgByIds(organizationId: string, ids: string[]) {
+    return this.db.policy.findMany({ where: { id: { in: ids }, organization_id: organizationId } });
+  }
+
+  /** Aggregate counts for the stat cards. `conditions` non-null = conditional. */
+  async policyStats(organizationId: string) {
+    const base: Prisma.PolicyWhereInput = { organization_id: organizationId };
+    const [total, allow, deny, unconditional] = await Promise.all([
+      this.db.policy.count({ where: base }),
+      this.db.policy.count({ where: { ...base, effect: 'ALLOW' } }),
+      this.db.policy.count({ where: { ...base, effect: 'DENY' } }),
+      this.db.policy.count({ where: { ...base, conditions: { equals: Prisma.DbNull } } }),
+    ]);
+    return { total, allow, deny, conditional: total - unconditional };
   }
 
   findInOrg(organizationId: string, id: string) {

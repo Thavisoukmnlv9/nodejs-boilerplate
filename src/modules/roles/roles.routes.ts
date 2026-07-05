@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '@/common/utils/asyncHandler';
 import { authGuard, requirePermission, validate } from '@/common/middleware';
 import { rolesController } from '@/modules/roles/roles.controller';
-import { createRoleSchema, listRolesQuery, roleIdParam, updateRoleSchema } from '@/modules/roles/role.schema';
+import { bulkRolesSchema, createRoleSchema, exportRolesQuery, listRolesQuery, roleIdParam, updateRoleSchema } from '@/modules/roles/role.schema';
 
 /** Mounted at /api/v1/roles. Lists system + org-scoped roles and manages custom roles. */
 export const rolesRoutes = Router();
@@ -15,12 +15,36 @@ rolesRoutes.get(
   asyncHandler(rolesController.list),
 );
 
-// NOTE: /permissions MUST be registered before /:id (Express matches in order).
+// NOTE: literal GET paths (/permissions, /stats, /export) MUST be registered before
+// /:id (Express matches in order).
 rolesRoutes.get(
   '/permissions',
   authGuard,
   requirePermission('platform.roles.read'),
   asyncHandler(rolesController.listPermissions),
+);
+
+rolesRoutes.get(
+  '/stats',
+  authGuard,
+  requirePermission('platform.roles.read'),
+  asyncHandler(rolesController.stats),
+);
+
+rolesRoutes.get(
+  '/export',
+  authGuard,
+  requirePermission('platform.roles.read'),
+  validate({ query: exportRolesQuery }),
+  asyncHandler(rolesController.exportCsv),
+);
+
+rolesRoutes.post(
+  '/bulk',
+  authGuard,
+  requirePermission('platform.roles.manage'),
+  validate({ body: bulkRolesSchema }),
+  asyncHandler(rolesController.bulk),
 );
 
 rolesRoutes.get(

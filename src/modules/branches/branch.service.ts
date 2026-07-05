@@ -1,9 +1,11 @@
 import type { Branch } from '@/generated/prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '@/common/errors';
+import { type BulkResult, runBulk } from '@/common/utils/bulk';
+import { type CsvColumn, EXPORT_ROW_CAP, toCsv } from '@/common/utils/csv';
 import { paginate, type Paginated } from '@/common/utils/pagination';
 import { type BranchRepository, branchRepository } from '@/modules/branches/branch.repository';
-import type { CreateBranchInput, ListBranchesQuery, UpdateBranchInput } from '@/modules/branches/branch.schema';
-import type { BranchView } from '@/modules/branches/branch.types';
+import type { BulkBranchesInput, CreateBranchInput, ExportBranchesQuery, ListBranchesQuery, UpdateBranchInput } from '@/modules/branches/branch.schema';
+import type { BranchStats, BranchView } from '@/modules/branches/branch.types';
 
 type IdFilter = string | { in: string[] };
 
@@ -47,8 +49,70 @@ export class BranchService {
       is_active: params.is_active,
       vertical: params.vertical,
       idFilter,
+      sort: params.sort,
+      order: params.order,
     });
     return paginate(items.map(toView), total, params);
+  }
+
+  async stats(organizationId: string, idFilter: IdFilter | undefined): Promise<BranchStats> {
+    return this.repo.branchStats(organizationId, idFilter);
+  }
+
+  async exportCsv(organizationId: string, params: ExportBranchesQuery, idFilter: IdFilter | undefined): Promise<string> {
+    const branches = await this.repo.listForExport(organizationId, {
+      q: params.q,
+      is_active: params.is_active,
+      vertical: params.vertical,
+      idFilter,
+      sort: params.sort,
+      order: params.order,
+      cap: EXPORT_ROW_CAP,
+    });
+    const pct = (bps: number) => `${(bps / 100).toFixed(2)}%`;
+    const columns: CsvColumn<BranchView>[] = [
+      { key: 'name', header: 'Name', value: (b) => b.name },
+      { key: 'code', header: 'Code', value: (b) => b.code },
+      { key: 'vertical', header: 'Vertical', value: (b) => b.vertical },
+      { key: 'is_main', header: 'Main', value: (b) => b.is_main },
+      { key: 'is_active', header: 'Active', value: (b) => b.is_active },
+      { key: 'currency_code', header: 'Currency', value: (b) => b.currency_code },
+      { key: 'tax_rate', header: 'Tax rate', value: (b) => pct(b.tax_rate_bps) },
+      { key: 'service_fee', header: 'Service fee', value: (b) => pct(b.service_fee_bps) },
+      { key: 'email', header: 'Email', value: (b) => b.email },
+      { key: 'phone', header: 'Phone', value: (b) => b.phone },
+    ];
+    return toCsv(branches.map(toView), columns);
+  }
+
+  /**
+   * Apply a bulk action to a set of branches, reporting per-id outcomes. `delete`
+   * enforces the same "cannot delete the main branch" invariant as the single path;
+   * `archive`/`activate` toggle `is_active`. Out-of-scope ids simply aren't found.
+   */
+  async bulk(organizationId: string, input: BulkBranchesInput, idFilter: IdFilter | undefined): Promise<BulkResult> {
+    const branches = await this.repo.findByIds(organizationId, input.ids, idFilter);
+    const byId = new Map(branches.map((b) => [b.id, b]));
+
+    return runBulk(input.ids, async (id) => {
+      const branch = byId.get(id);
+      if (!branch) throw new NotFoundError('Branch not found');
+      switch (input.action) {
+        case 'delete': {
+          if (branch.is_main) throw new BadRequestError('Cannot delete the main branch');
+          await this.repo.delete(id);
+          return;
+        }
+        case 'archive': {
+          await this.repo.update(id, { is_active: false });
+          return;
+        }
+        case 'activate': {
+          await this.repo.update(id, { is_active: true });
+          return;
+        }
+      }
+    });
   }
 
   async get(organizationId: string, branchId: string): Promise<BranchView> {

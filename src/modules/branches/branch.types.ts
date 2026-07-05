@@ -20,3 +20,11 @@ export interface BranchView {
   created_at: string;
   updated_at: string;
 }
+
+/** Aggregate counts for the branches-page stat cards (respects branch scope). */
+export interface BranchStats {
+  total: number;
+  active: number;
+  archived: number;
+  by_vertical: Record<string, number>;
+}

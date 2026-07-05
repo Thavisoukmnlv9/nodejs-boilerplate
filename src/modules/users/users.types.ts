@@ -31,3 +31,12 @@ export interface InviteIssued {
   invite_token: string;
   invitation_expires_at: string;
 }
+
+/** Aggregate counts for the members-page stat cards (independent of list filters). */
+export interface UserStats {
+  total: number;
+  active: number;
+  pending: number;
+  suspended: number;
+  inactive: number;
+}

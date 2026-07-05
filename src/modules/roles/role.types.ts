@@ -17,3 +17,11 @@ export interface PermissionView {
   module: string;
   description: string | null;
 }
+
+/** Aggregate counts for the roles-page stat cards. */
+export interface RoleStats {
+  total: number;
+  system: number;
+  custom: number;
+  unused: number;
+}

@@ -1,11 +1,11 @@
 import type { Request } from 'express';
 import { Router } from 'express';
 import { asyncHandler } from '@/common/utils/asyncHandler';
-import { authGuard, requirePermission, requirePolicy, validate } from '@/common/middleware';
+import { authGuard, requireAnyPermission, requirePermission, requirePolicy, validate } from '@/common/middleware';
 import type { AuthContext } from '@/common/types/context';
 import { branchesController } from '@/modules/branches/branches.controller';
 import { branchRepository } from '@/modules/branches/branch.repository';
-import { branchIdParam, createBranchSchema, listBranchesQuery, updateBranchSchema } from '@/modules/branches/branch.schema';
+import { branchIdParam, bulkBranchesSchema, createBranchSchema, exportBranchesQuery, listBranchesQuery, updateBranchSchema } from '@/modules/branches/branch.schema';
 
 /** Mounted at /api/v1/branches. List is branch-scope clamped; mutations pass through
  *  requirePermission (RBAC gate) AND requirePolicy (ABAC refinement — e.g. the demo
@@ -22,6 +22,29 @@ branchesRoutes.get(
   requirePermission('platform.branches.read'),
   validate({ query: listBranchesQuery }),
   asyncHandler(branchesController.list),
+);
+
+branchesRoutes.get(
+  '/stats',
+  authGuard,
+  requirePermission('platform.branches.read'),
+  asyncHandler(branchesController.stats),
+);
+
+branchesRoutes.get(
+  '/export',
+  authGuard,
+  requirePermission('platform.branches.read'),
+  validate({ query: exportBranchesQuery }),
+  asyncHandler(branchesController.exportCsv),
+);
+
+branchesRoutes.post(
+  '/bulk',
+  authGuard,
+  requireAnyPermission('platform.branches.manage', 'platform.branches.delete'),
+  validate({ body: bulkBranchesSchema }),
+  asyncHandler(branchesController.bulk),
 );
 
 branchesRoutes.get(

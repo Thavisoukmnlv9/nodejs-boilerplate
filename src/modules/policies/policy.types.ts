@@ -11,3 +11,11 @@ export interface PolicyView {
   created_at: string;
   updated_at: string;
 }
+
+/** Aggregate counts for the policies-page stat cards. */
+export interface PolicyStats {
+  total: number;
+  allow: number;
+  deny: number;
+  conditional: number;
+}

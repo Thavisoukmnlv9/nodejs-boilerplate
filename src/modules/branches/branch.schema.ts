@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { paginationQuery } from '@/common/utils/pagination';
+import { sortableFields } from '@/common/utils/sortableQuery';
 
 export const BRANCH_VERTICALS = ['GENERAL', 'RETAIL', 'SERVICE'] as const;
 export const BRANCH_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY'] as const;
+export const BRANCH_SORT_FIELDS = ['name', 'code', 'vertical', 'is_active', 'created_at', 'updated_at'] as const;
 
 const code = z
   .string()
@@ -24,14 +26,33 @@ const timezone = z.string().refine((tz) => {
 /** Query-string booleans: only literal "true"/"false" (z.coerce.boolean treats "false" as true). */
 const queryBool = z.union([z.literal('true'), z.literal('false')]).transform((v) => v === 'true');
 
-export const listBranchesQuery = paginationQuery.extend({
+const branchFilters = {
   q: z.string().trim().min(1).max(120).optional(),
   is_active: queryBool.optional(),
   vertical: z.enum(BRANCH_VERTICALS).optional(),
   branch_id: z.string().min(1).optional(),
+};
+
+export const listBranchesQuery = paginationQuery.extend({
+  ...branchFilters,
+  ...sortableFields(BRANCH_SORT_FIELDS),
+});
+
+export const exportBranchesQuery = z.object({
+  ...branchFilters,
+  ...sortableFields(BRANCH_SORT_FIELDS),
+  format: z.enum(['csv']).default('csv'),
 });
 
 export const branchIdParam = z.object({ id: z.string().min(1) });
+
+/** Bulk actions from the branches table's selection bar. */
+export const BRANCH_BULK_ACTIONS = ['archive', 'activate', 'delete'] as const;
+
+export const bulkBranchesSchema = z.object({
+  action: z.enum(BRANCH_BULK_ACTIONS),
+  ids: z.array(z.string().min(1)).min(1).max(200),
+});
 
 export const createBranchSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120),
@@ -70,5 +91,7 @@ export const updateBranchSchema = z
   .refine((v) => Object.keys(v).length > 0, { message: 'At least one field must be provided' });
 
 export type ListBranchesQuery = z.infer<typeof listBranchesQuery>;
+export type ExportBranchesQuery = z.infer<typeof exportBranchesQuery>;
+export type BulkBranchesInput = z.infer<typeof bulkBranchesSchema>;
 export type CreateBranchInput = z.infer<typeof createBranchSchema>;
 export type UpdateBranchInput = z.infer<typeof updateBranchSchema>;

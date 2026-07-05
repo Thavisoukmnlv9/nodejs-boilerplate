@@ -2,11 +2,13 @@ import { Router } from 'express';
 import { asyncHandler } from '@/common/utils/asyncHandler';
 import { authGuard, requirePermission, validate } from '@/common/middleware';
 import { usersController } from '@/modules/users/users.controller';
-import { inviteUserSchema, listUsersQuery, updateUserSchema, userIdParam } from '@/modules/users/users.schema';
+import { bulkUsersSchema, exportUsersQuery, inviteUserSchema, listUsersQuery, updateUserSchema, userIdParam } from '@/modules/users/users.schema';
 
 /**
  * Mounted at /api/v1/users. The canonical module template: each route composes
  * authGuard → requirePermission(code) → validate(schema) → asyncHandler(controller).
+ * NOTE: literal GET paths (/stats, /export) are declared before /:id so the param
+ * route does not swallow them.
  */
 export const usersRoutes = Router();
 
@@ -16,6 +18,29 @@ usersRoutes.get(
   requirePermission('platform.users.read'),
   validate({ query: listUsersQuery }),
   asyncHandler(usersController.list),
+);
+
+usersRoutes.get(
+  '/stats',
+  authGuard,
+  requirePermission('platform.users.read'),
+  asyncHandler(usersController.stats),
+);
+
+usersRoutes.get(
+  '/export',
+  authGuard,
+  requirePermission('platform.users.read'),
+  validate({ query: exportUsersQuery }),
+  asyncHandler(usersController.exportCsv),
+);
+
+usersRoutes.post(
+  '/bulk',
+  authGuard,
+  requirePermission('platform.users.manage'),
+  validate({ body: bulkUsersSchema }),
+  asyncHandler(usersController.bulk),
 );
 
 usersRoutes.get(

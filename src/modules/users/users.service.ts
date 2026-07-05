@@ -1,10 +1,12 @@
 import type { Prisma } from '@/generated/prisma/client';
 import { generateOpaqueToken } from '@/access/tokens';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/common/errors';
+import { type BulkResult, runBulk } from '@/common/utils/bulk';
+import { type CsvColumn, EXPORT_ROW_CAP, toCsv } from '@/common/utils/csv';
 import { paginate, type Paginated } from '@/common/utils/pagination';
 import { type UsersRepository, usersRepository } from '@/modules/users/users.repository';
-import type { InviteUserInput, ListUsersQuery, UpdateUserInput } from '@/modules/users/users.schema';
-import type { InviteIssued, MemberView } from '@/modules/users/users.types';
+import type { BulkUsersInput, ExportUsersQuery, InviteUserInput, ListUsersQuery, UpdateUserInput } from '@/modules/users/users.schema';
+import type { InviteIssued, MemberView, UserStats } from '@/modules/users/users.types';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -51,8 +53,79 @@ export class UsersService {
       q: params.q,
       status: params.status,
       role_id: params.role_id,
+      sort: params.sort,
+      order: params.order,
     });
     return paginate(items.map(toView), total, params);
+  }
+
+  async stats(organizationId: string): Promise<UserStats> {
+    return this.repo.memberStats(organizationId);
+  }
+
+  /** CSV of every member matching the filters (pagination ignored, hard-capped). */
+  async exportCsv(organizationId: string, params: ExportUsersQuery): Promise<string> {
+    const members = await this.repo.listMembersForExport(organizationId, {
+      q: params.q,
+      status: params.status,
+      role_id: params.role_id,
+      sort: params.sort,
+      order: params.order,
+      cap: EXPORT_ROW_CAP,
+    });
+    const columns: CsvColumn<MemberView>[] = [
+      { key: 'name', header: 'Name', value: (m) => m.user.name },
+      { key: 'email', header: 'Email', value: (m) => m.user.email },
+      { key: 'status', header: 'Status', value: (m) => m.status },
+      { key: 'role_id', header: 'Role ID', value: (m) => m.role_id },
+      { key: 'is_owner', header: 'Owner', value: (m) => m.is_owner },
+      { key: 'branch_count', header: 'Branches', value: (m) => m.branch_ids.length },
+      { key: 'staff_title', header: 'Title', value: (m) => m.staff_title },
+      { key: 'invited_at', header: 'Invited at', value: (m) => m.invited_at },
+      { key: 'accepted_at', header: 'Accepted at', value: (m) => m.accepted_at },
+    ];
+    return toCsv(members.map(toView), columns);
+  }
+
+  /**
+   * Apply a bulk action to a set of members, reporting per-id outcomes. The same
+   * invariants as the single-item paths are enforced per id (owner is immutable,
+   * you cannot act on yourself), so a mixed selection partially succeeds instead
+   * of failing atomically.
+   */
+  async bulk(organizationId: string, actingUserId: string, input: BulkUsersInput): Promise<BulkResult> {
+    const members = await this.repo.findMembersByIds(organizationId, input.ids);
+    const byId = new Map(members.map((m) => [m.id, m]));
+
+    if (input.action === 'set_role') {
+      // Validate the target role once for the whole batch.
+      await this.validateAssignment(organizationId, input.role_id, undefined);
+    }
+
+    return runBulk(input.ids, async (id) => {
+      const member = byId.get(id);
+      if (!member) throw new NotFoundError('User not found');
+
+      switch (input.action) {
+        case 'remove': {
+          if (member.is_owner) throw new ForbiddenError('Cannot remove the organization owner');
+          if (member.user_id === actingUserId) throw new ForbiddenError('You cannot remove yourself');
+          await this.repo.softDeleteMembership(id);
+          return;
+        }
+        case 'resend_invite': {
+          if (member.accepted_at) throw new ConflictError('Member has already accepted');
+          const { hash } = generateOpaqueToken();
+          await this.repo.regenerateInvite(id, hash, new Date(Date.now() + INVITE_TTL_MS));
+          return;
+        }
+        case 'set_role': {
+          this.assertRoleChangeAllowed(member, actingUserId);
+          await this.repo.setMemberRole(id, input.role_id as string);
+          return;
+        }
+      }
+    });
   }
 
   async get(organizationId: string, memberId: string): Promise<MemberView> {

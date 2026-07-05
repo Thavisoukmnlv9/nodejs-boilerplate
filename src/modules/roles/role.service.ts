@@ -1,10 +1,12 @@
 import type { Prisma } from '@/generated/prisma/client';
 import { BadRequestError, ConflictError, NotFoundError, ValidationError } from '@/common/errors';
-import { paginate, type Paginated, type PaginationParams } from '@/common/utils/pagination';
+import { type BulkResult, runBulk } from '@/common/utils/bulk';
+import { type CsvColumn, EXPORT_ROW_CAP, toCsv } from '@/common/utils/csv';
+import { paginate, type Paginated } from '@/common/utils/pagination';
 import { DANGER_ZONE_CODES, isKnownPermissionCode } from '@/config/permissions';
 import { type RoleRepository, roleRepository } from '@/modules/roles/role.repository';
-import type { CreateRoleInput, UpdateRoleInput } from '@/modules/roles/role.schema';
-import type { PermissionView, RoleView } from '@/modules/roles/role.types';
+import type { BulkRolesInput, CreateRoleInput, ExportRolesQuery, ListRolesQuery, UpdateRoleInput } from '@/modules/roles/role.schema';
+import type { PermissionView, RoleStats, RoleView } from '@/modules/roles/role.types';
 
 type RoleWithPerms = Prisma.RoleGetPayload<{
   include: { permissions: { include: { permission: true } }; _count: { select: { members: true } } };
@@ -39,9 +41,50 @@ export class RoleService {
     return role.permissions.map((rp) => rp.permission?.code).filter((c): c is string => Boolean(c));
   }
 
-  async listRoles(organizationId: string, params: PaginationParams): Promise<Paginated<RoleView>> {
-    const [items, total] = await this.repo.listForOrg(organizationId, params.limit, params.offset);
+  async listRoles(organizationId: string, params: ListRolesQuery): Promise<Paginated<RoleView>> {
+    const [items, total] = await this.repo.listForOrg(organizationId, {
+      limit: params.limit,
+      offset: params.offset,
+      q: params.q,
+      sort: params.sort,
+      order: params.order,
+    });
     return paginate(items.map(toView), total, params);
+  }
+
+  async stats(organizationId: string): Promise<RoleStats> {
+    return this.repo.roleStats(organizationId);
+  }
+
+  async exportCsv(organizationId: string, params: ExportRolesQuery): Promise<string> {
+    const roles = await this.repo.listForExport(organizationId, {
+      q: params.q,
+      sort: params.sort,
+      order: params.order,
+      cap: EXPORT_ROW_CAP,
+    });
+    const columns: CsvColumn<RoleView>[] = [
+      { key: 'name', header: 'Name', value: (r) => r.name },
+      { key: 'description', header: 'Description', value: (r) => r.description },
+      { key: 'is_system', header: 'System', value: (r) => r.is_system },
+      { key: 'member_count', header: 'Members', value: (r) => r.member_count },
+      { key: 'permission_count', header: 'Permissions', value: (r) => r.permission_codes.length },
+    ];
+    return toCsv(roles.map(toView), columns);
+  }
+
+  /** Bulk-delete custom roles; system/global and in-use roles are skipped per-id. */
+  async bulk(organizationId: string, input: BulkRolesInput): Promise<BulkResult> {
+    const roles = await this.repo.findManyForOrgByIds(organizationId, input.ids);
+    const byId = new Map(roles.map((r) => [r.id, r]));
+    return runBulk(input.ids, async (id) => {
+      const role = byId.get(id);
+      if (!role) throw new NotFoundError('Role not found');
+      if (role.is_system || role.organization_id === null) throw new BadRequestError('Cannot delete a system role');
+      const members = role._count?.members ?? 0;
+      if (members > 0) throw new ConflictError(`${members} member(s) still have this role`);
+      await this.repo.delete(id);
+    });
   }
 
   async getRole(organizationId: string, roleId: string): Promise<RoleView> {

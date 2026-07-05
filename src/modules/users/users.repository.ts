@@ -1,5 +1,20 @@
 import type { Prisma, UserStatus } from '@/generated/prisma/client';
 import { BaseRepository } from '@/infra/prisma';
+import { buildOrderBy, type SortOrder } from '@/common/utils/sortableQuery';
+
+/** Public sort column → Prisma orderBy path for the members list. */
+const MEMBER_ORDER_BY: Record<string, (dir: SortOrder) => Prisma.OrganizationMemberOrderByWithRelationInput> = {
+  name: (dir) => ({ user: { name: dir } }),
+  email: (dir) => ({ user: { email: dir } }),
+  status: (dir) => ({ user: { status: dir } }),
+  invited_at: (dir) => ({ invited_at: dir }),
+};
+
+// Default ordering when the caller supplies no explicit sort: owner pinned first.
+const MEMBER_DEFAULT_ORDER: Prisma.OrganizationMemberOrderByWithRelationInput[] = [
+  { is_owner: 'desc' },
+  { invited_at: 'desc' },
+];
 
 const withDetails = {
   user: true,
@@ -52,19 +67,64 @@ async function replaceBranchAccess(tx: Prisma.TransactionClient, memberId: strin
 export class UsersRepository extends BaseRepository {
   listMembers(
     organizationId: string,
-    opts: { limit: number; offset: number; q?: string; status?: string; role_id?: string },
+    opts: {
+      limit: number;
+      offset: number;
+      q?: string;
+      status?: string;
+      role_id?: string;
+      sort?: string;
+      order?: SortOrder;
+    },
   ) {
     const where = buildMemberListWhere(organizationId, opts, this.notDeleted);
+    const orderBy = buildOrderBy(opts.sort, opts.order ?? 'desc', MEMBER_ORDER_BY, MEMBER_DEFAULT_ORDER);
     return Promise.all([
       this.db.organizationMember.findMany({
         where,
         include: withDetails,
-        orderBy: [{ is_owner: 'desc' }, { invited_at: 'desc' }],
+        orderBy,
         take: opts.limit,
         skip: opts.offset,
       }),
       this.db.organizationMember.count({ where }),
     ]);
+  }
+
+  /** All members matching the filters (no pagination) — export path, hard-capped. */
+  listMembersForExport(
+    organizationId: string,
+    opts: { q?: string; status?: string; role_id?: string; sort?: string; order?: SortOrder; cap: number },
+  ) {
+    const where = buildMemberListWhere(organizationId, opts, this.notDeleted);
+    const orderBy = buildOrderBy(opts.sort, opts.order ?? 'desc', MEMBER_ORDER_BY, MEMBER_DEFAULT_ORDER);
+    return this.db.organizationMember.findMany({ where, include: withDetails, orderBy, take: opts.cap });
+  }
+
+  /** Load a set of memberships (with details) for bulk-action invariant checks. */
+  findMembersByIds(organizationId: string, ids: string[]) {
+    return this.db.organizationMember.findMany({
+      where: { id: { in: ids }, organization_id: organizationId, ...this.notDeleted },
+      include: withDetails,
+    });
+  }
+
+  setMemberRole(memberId: string, roleId: string) {
+    return this.db.organizationMember.update({ where: { id: memberId }, data: { role_id: roleId } });
+  }
+
+  /** Aggregate member counts for the stat cards (independent of the list filters). */
+  async memberStats(organizationId: string) {
+    const base = { organization_id: organizationId, ...this.notDeleted };
+    const accepted = { accepted_at: { not: null } } as const;
+    const [total, pending, active, suspended, inactive] = await Promise.all([
+      this.db.organizationMember.count({ where: base }),
+      this.db.organizationMember.count({ where: { ...base, accepted_at: null } }),
+      this.db.organizationMember.count({ where: { ...base, ...accepted, user: { status: 'ACTIVE' } } }),
+      this.db.organizationMember.count({ where: { ...base, ...accepted, user: { status: 'SUSPENDED' } } }),
+      this.db.organizationMember.count({ where: { ...base, ...accepted, user: { status: 'INACTIVE' } } }),
+    ]);
+    return { total, pending, active, suspended, inactive };
   }
 
   findMember(organizationId: string, memberId: string) {
