@@ -30,7 +30,7 @@ usersRoutes.get(
 usersRoutes.get(
   '/export',
   authGuard,
-  requirePermission('platform.users.read'),
+  requirePermission('platform.users.export'),
   validate({ query: exportUsersQuery }),
   asyncHandler(usersController.exportCsv),
 );
@@ -38,7 +38,7 @@ usersRoutes.get(
 usersRoutes.post(
   '/bulk',
   authGuard,
-  requirePermission('platform.users.manage'),
+  requirePermission('platform.users.bulk'),
   validate({ body: bulkUsersSchema }),
   asyncHandler(usersController.bulk),
 );

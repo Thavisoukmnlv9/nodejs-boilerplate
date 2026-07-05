@@ -1,8 +1,7 @@
 import type { Request, Response } from 'express';
-import { accessControl, ensureAuthContext, getBranchScope, resolveBranchWhere } from '@/access';
-import { ForbiddenError } from '@/common/errors';
+import { getBranchScope, resolveBranchWhere } from '@/access';
 import { branchService } from '@/modules/branches/branch.service';
-import type { BulkBranchesInput, ExportBranchesQuery, ListBranchesQuery } from '@/modules/branches/branch.schema';
+import type { ExportBranchesQuery, ListBranchesQuery } from '@/modules/branches/branch.schema';
 
 /**
  * Branch-scope is resolved HERE (at the HTTP edge) and passed into the service, so
@@ -33,19 +32,14 @@ export const branchesController = {
   },
 
   /**
-   * `delete` requires the stricter branches.delete permission (parity with the
-   * single-item DELETE); `archive`/`activate` need only branches.manage. Enforced
-   * per-action here since one route serves all three. Scope clamps the target set.
+   * `platform.branches.bulk` is the sole RBAC gate (enforced at the route). Scope
+   * clamps the target set, and the service still refuses to delete the main branch
+   * per-item — that reason surfaces in the partial-success result.
    */
   async bulk(req: Request, res: Response): Promise<void> {
-    const ctx = await ensureAuthContext(req);
-    const action = (req.body as BulkBranchesInput).action;
-    const needed = action === 'delete' ? 'platform.branches.delete' : 'platform.branches.manage';
-    const decision = await accessControl.can({ ctx, permission: needed });
-    if (!decision.allowed) throw new ForbiddenError(`Permission denied: ${needed}`);
     const scope = await getBranchScope(req);
     const idFilter = resolveBranchWhere(undefined, scope);
-    res.json(await branchService.bulk(ctx.organization.id, req.body, idFilter));
+    res.json(await branchService.bulk(req.authContext!.organization.id, req.body, idFilter));
   },
 
   async get(req: Request, res: Response): Promise<void> {

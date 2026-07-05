@@ -33,7 +33,7 @@ policiesRoutes.get(
 policiesRoutes.get(
   '/export',
   authGuard,
-  requirePermission('platform.policies.read'),
+  requirePermission('platform.policies.export'),
   validate({ query: exportPoliciesQuery }),
   asyncHandler(policiesController.exportCsv),
 );
@@ -41,7 +41,7 @@ policiesRoutes.get(
 policiesRoutes.post(
   '/bulk',
   authGuard,
-  requirePermission('platform.policies.manage'),
+  requirePermission('platform.policies.bulk'),
   validate({ body: bulkPoliciesSchema }),
   asyncHandler(policiesController.bulk),
 );

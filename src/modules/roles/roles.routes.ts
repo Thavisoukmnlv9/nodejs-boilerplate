@@ -34,7 +34,7 @@ rolesRoutes.get(
 rolesRoutes.get(
   '/export',
   authGuard,
-  requirePermission('platform.roles.read'),
+  requirePermission('platform.roles.export'),
   validate({ query: exportRolesQuery }),
   asyncHandler(rolesController.exportCsv),
 );
@@ -42,7 +42,7 @@ rolesRoutes.get(
 rolesRoutes.post(
   '/bulk',
   authGuard,
-  requirePermission('platform.roles.manage'),
+  requirePermission('platform.roles.bulk'),
   validate({ body: bulkRolesSchema }),
   asyncHandler(rolesController.bulk),
 );

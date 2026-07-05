@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import { Router } from 'express';
 import { asyncHandler } from '@/common/utils/asyncHandler';
-import { authGuard, requireAnyPermission, requirePermission, requirePolicy, validate } from '@/common/middleware';
+import { authGuard, requirePermission, requirePolicy, validate } from '@/common/middleware';
 import type { AuthContext } from '@/common/types/context';
 import { branchesController } from '@/modules/branches/branches.controller';
 import { branchRepository } from '@/modules/branches/branch.repository';
@@ -34,7 +34,7 @@ branchesRoutes.get(
 branchesRoutes.get(
   '/export',
   authGuard,
-  requirePermission('platform.branches.read'),
+  requirePermission('platform.branches.export'),
   validate({ query: exportBranchesQuery }),
   asyncHandler(branchesController.exportCsv),
 );
@@ -42,7 +42,7 @@ branchesRoutes.get(
 branchesRoutes.post(
   '/bulk',
   authGuard,
-  requireAnyPermission('platform.branches.manage', 'platform.branches.delete'),
+  requirePermission('platform.branches.bulk'),
   validate({ body: bulkBranchesSchema }),
   asyncHandler(branchesController.bulk),
 );
