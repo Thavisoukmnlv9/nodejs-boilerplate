@@ -14,16 +14,16 @@
 #       postgres:
 #         image: postgres:16-alpine
 #         env:
-#           POSTGRES_USER: bsync
-#           POSTGRES_PASSWORD: bsync_dev
-#           POSTGRES_DB: business_sync_test
+#           POSTGRES_USER: boilerplate
+#           POSTGRES_PASSWORD: boilerplate_dev
+#           POSTGRES_DB: boilerplate_test
 #         ports: ['5432:5432']
 #         options: >-
-#           --health-cmd "pg_isready -U bsync"
+#           --health-cmd "pg_isready -U boilerplate"
 #           --health-interval 10s --health-timeout 5s --health-retries 5
 
 #     env:
-#       DATABASE_URL: postgresql://bsync:bsync_dev@localhost:5432/business_sync_test?schema=public
+#       DATABASE_URL: postgresql://boilerplate:boilerplate_dev@localhost:5432/boilerplate_test?schema=public
 #       JWT_SECRET: ci-secret-ci-secret-ci-secret-0123456789
 #       RUN_INTEGRATION: '1'
 
@@ -59,4 +59,4 @@
 #         run: npm run build
 
 #       - name: Docker build
-#         run: docker build -f docker/Dockerfile -t business-sync-api:${{ github.sha }} .
+#         run: docker build -f docker/Dockerfile -t nodejs-boilerplate:${{ github.sha }} .

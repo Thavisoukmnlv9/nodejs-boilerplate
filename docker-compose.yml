@@ -5,7 +5,7 @@
 x-app-env: &app-env
   NODE_ENV: production
   PORT: "8080"
-  DATABASE_URL: postgresql://${POSTGRES_USER:-bsync}:${POSTGRES_PASSWORD:-bsync_dev}@postgres:5432/${POSTGRES_DB:-business_sync}?schema=public
+  DATABASE_URL: postgresql://${POSTGRES_USER:-boilerplate}:${POSTGRES_PASSWORD:-boilerplate_dev}@postgres:5432/${POSTGRES_DB:-boilerplate}?schema=public
   JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please-set-a-32char-secret}
   ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3100}
   STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
@@ -35,15 +35,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-bsync}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bsync_dev}
-      POSTGRES_DB: ${POSTGRES_DB:-business_sync}
+      POSTGRES_USER: ${POSTGRES_USER:-boilerplate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-boilerplate_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-boilerplate}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bsync}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-boilerplate}"]
       interval: 10s
       timeout: 5s
       retries: 5

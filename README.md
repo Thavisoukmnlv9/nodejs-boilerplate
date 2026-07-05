@@ -1,9 +1,9 @@
-# Business Sync API
+# Boilerplate API
 
 Production-grade **Node / Express / TypeScript / Prisma** REST API — the platform-core
 of a multi-tenant POS/commerce SaaS. It is a **wire-compatible reimplementation** of a
-proven FastAPI service (`business-sync-backend-services`) and speaks the exact contract
-the existing **React admin portal** (`business-sync-admin-portal`) expects, over the
+proven FastAPI service (`boilerplate-backend-services`) and speaks the exact contract
+the existing **React admin portal** (`boilerplate-admin-portal`) expects, over the
 **same PostgreSQL database**.
 
 > The auth + RBAC design is ported from the FastAPI reference and must not drift. Token

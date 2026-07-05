@@ -4,6 +4,6 @@
  */
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET ||= 'test-secret-test-secret-test-secret-0123456789';
-process.env.DATABASE_URL ||= 'postgresql://bsync:bsync_dev@localhost:5432/business_sync_test?schema=public';
+process.env.DATABASE_URL ||= 'postgresql://boilerplate:boilerplate_dev@localhost:5432/boilerplate_test?schema=public';
 process.env.LOG_LEVEL ||= 'silent';
 process.env.STORAGE_DRIVER ||= 'local';

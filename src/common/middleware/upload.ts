@@ -13,7 +13,7 @@ import { BadRequestError } from '@/common/errors';
  * feature service then hands the temp file to the storage adapter and deletes it.
  * Oversize / MulterError cases are translated by the global error handler.
  */
-const TMP_DIR = join(tmpdir(), 'business-sync-uploads');
+const TMP_DIR = join(tmpdir(), 'boilerplate-uploads');
 mkdirSync(TMP_DIR, { recursive: true });
 
 const storage = multer.diskStorage({

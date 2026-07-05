@@ -1,9 +1,9 @@
 {
-  "name": "business-sync-api",
+  "name": "nodejs-boilerplate",
   "version": "0.1.0",
   "private": true,
   "packageManager": "npm@11.6.0",
-  "description": "Business Sync — production Node/Express/Prisma REST API (platform-core reimplementation of the FastAPI reference service).",
+  "description": "Boilerplate — production Node/Express/Prisma REST API (platform-core reimplementation of the FastAPI reference service).",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=22"

@@ -82,7 +82,7 @@ function buildDocument() {
   const generator = new OpenApiGeneratorV3(registry.definitions);
   return generator.generateDocument({
     openapi: '3.0.0',
-    info: { title: env.APP_NAME, version: env.APP_VERSION, description: 'Business Sync platform-core API' },
+    info: { title: env.APP_NAME, version: env.APP_VERSION, description: 'Boilerplate platform-core API' },
     servers: [{ url: '/' }],
   });
 }

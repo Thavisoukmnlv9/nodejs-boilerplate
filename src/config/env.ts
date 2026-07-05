@@ -46,7 +46,7 @@ const schema = z
     // App
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().positive().default(8080),
-    APP_NAME: z.string().default('Business Sync API'),
+    APP_NAME: z.string().default('Boilerplate API'),
     APP_VERSION: z.string().default('0.1.0'),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),
     ENABLE_DOCS: zBool(false),
@@ -87,7 +87,7 @@ const schema = z
 
     // Email (sent inline; the console provider just logs)
     EMAIL_PROVIDER: z.enum(['console', 'smtp', 'ses', 'resend']).default('console'),
-    EMAIL_FROM: z.string().default('noreply@business-sync.io'),
+    EMAIL_FROM: z.string().default('noreply@boilerplate.io'),
     WEB_BASE_URL: z.string().default('http://localhost:3100'),
 
     // Rate limiting
