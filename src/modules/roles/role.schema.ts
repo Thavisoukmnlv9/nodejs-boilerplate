@@ -31,8 +31,8 @@ export const bulkRolesSchema = z.object({
 });
 
 export const createRoleSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(80),
-  description: z.string().max(300).optional(),
+  name: z.string().trim().min(1, 'Name is required').max(80, 'Keep the name under 80 characters'),
+  description: z.string().max(300, 'Keep the description under 300 characters').nullable().optional(),
   permission_codes: z.array(z.string().min(1)).max(500).optional().default([]),
 });
 

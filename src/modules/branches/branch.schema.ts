@@ -55,13 +55,13 @@ export const bulkBranchesSchema = z.object({
 });
 
 export const createBranchSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(120),
-  code: code.optional(),
-  address: z.string().max(300).optional(),
-  type: z.string().max(60).optional(),
-  vertical: z.enum(BRANCH_VERTICALS).optional(),
-  phone: z.string().max(40).optional(),
-  email: z.email().optional(),
+  name: z.string().trim().min(1, 'Name is required').max(120, 'Keep the name under 120 characters'),
+  code: code.nullable().optional(),
+  address: z.string().max(300, 'Keep the address under 300 characters').nullable().optional(),
+  type: z.string().max(60, 'Keep the type under 60 characters').nullable().optional(),
+  vertical: z.enum(BRANCH_VERTICALS).nullable().optional(),
+  phone: z.string().max(40, 'Keep the phone under 40 characters').nullable().optional(),
+  email: z.email('Enter a valid email address').nullable().optional(),
   timezone: timezone.optional(),
   currency_code: z.enum(BRANCH_CURRENCIES).optional(),
   locale: z.string().max(10).optional(),

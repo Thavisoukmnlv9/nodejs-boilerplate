@@ -43,7 +43,7 @@ export const createPolicySchema = z.object({
   subject: z.enum(POLICY_SUBJECTS),
   role_id: z.string().min(1).nullable().optional(),
   conditions,
-  description: z.string().max(300).optional(),
+  description: z.string().max(300, 'Keep the description under 300 characters').nullable().optional(),
 });
 
 export const updatePolicySchema = z

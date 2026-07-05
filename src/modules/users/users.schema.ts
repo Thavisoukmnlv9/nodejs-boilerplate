@@ -43,13 +43,13 @@ export const bulkUsersSchema = z
   });
 
 export const inviteUserSchema = z.object({
-  email: z.email(),
-  name: z.string().max(120).optional(),
-  role_id: z.string().min(1),
+  email: z.email('Enter a valid email address'),
+  name: z.string().max(120, 'Keep the name under 120 characters').optional(),
+  role_id: z.string().min(1, 'Select a role'),
   branch_ids: z.array(z.string().min(1)).max(100).optional().default([]),
-  default_branch_id: z.string().min(1).optional(),
-  staff_title: z.string().max(120).optional(),
-  staff_note: z.string().max(500).optional(),
+  default_branch_id: z.string().min(1).nullable().optional(),
+  staff_title: z.string().max(120, 'Keep the title under 120 characters').nullable().optional(),
+  staff_note: z.string().max(500, 'Keep notes under 500 characters').nullable().optional(),
 });
 
 export const updateUserSchema = z
