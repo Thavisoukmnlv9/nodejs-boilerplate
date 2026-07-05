@@ -4,7 +4,14 @@
   "private": true,
   "packageManager": "npm@11.6.0",
   "description": "Boilerplate — production Node/Express/Prisma REST API (platform-core reimplementation of the FastAPI reference service).",
-  "license": "UNLICENSED",
+  "author": "Thavisouk MNLV <thavisoukmnlv@gmail.com> (https://github.com/Thavisoukmnlv9)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Thavisoukmnlv9/nodejs-boilerplate.git"
+  },
+  "homepage": "https://github.com/Thavisoukmnlv9/nodejs-boilerplate#readme",
+  "bugs": "https://github.com/Thavisoukmnlv9/nodejs-boilerplate/issues",
   "engines": {
     "node": ">=22"
   },
