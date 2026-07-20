@@ -1,5 +1,6 @@
 import type { Server } from 'node:http';
 import { createApp } from '@/app';
+import { printStartupBanner } from '@/config/banner';
 import { env } from '@/config/env';
 import { logger } from '@/config/logger';
 import { connectPrisma, disconnectPrisma } from '@/infra/prisma';
@@ -11,7 +12,16 @@ async function bootstrap(): Promise<void> {
   const app = createApp();
 
   const server: Server = app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, env: env.NODE_ENV }, `${env.APP_NAME} listening on :${env.PORT}`);
+    // Dev: a pretty, human-readable boot banner. Prod: one structured event for
+    // log collectors (no banner, no secrets).
+    if (env.isDev) {
+      printStartupBanner();
+    } else {
+      logger.info(
+        { port: env.PORT, env: env.NODE_ENV, docs: env.ENABLE_DOCS },
+        `${env.APP_NAME} started on :${env.PORT}`,
+      );
+    }
   });
 
   installLifecycleHandlers(server);
